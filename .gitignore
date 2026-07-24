@@ -12,3 +12,4 @@ apps/*/dist/
 .tmp-retrieve/
 .cursor/
 build-errors.txt
+docs/images/.edge-profile-*/
