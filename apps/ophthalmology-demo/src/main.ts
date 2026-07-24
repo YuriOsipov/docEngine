@@ -29,7 +29,7 @@ registerDateField({ registerField });
 
 const defaultDocument = createOphthalmologyTemplate();
 
-let editorInstance = createEditor({
+let docEngine = createEditor({
   holder: '#editorjs',
   data: defaultDocument,
   defaultDocument,
@@ -60,7 +60,7 @@ const designToggle = document.getElementById('design-mode-toggle');
 
 designToggle?.addEventListener('change', async () => {
 
-  await editorInstance.setDesignMode(designToggle.checked);
+  await docEngine.setDesignMode(designToggle.checked);
 
 });
 
@@ -155,7 +155,7 @@ function formatMissingRequiredMessage(missing) {
 
 async function ensureRequiredFieldsFilled() {
 
-  const { valid, missing } = await editorInstance.validate();
+  const { valid, missing } = await docEngine.validate();
 
   if (valid) return true;
 
@@ -171,7 +171,7 @@ document.getElementById('btn-save-full-document')?.addEventListener('click', asy
 
   if (!(await ensureRequiredFieldsFilled())) return;
 
-  await saveJson(await editorInstance.exportDoc(), 'ophthalmology-full-document.json');
+  await saveJson(await docEngine.exportDoc(), 'ophthalmology-full-document.json');
 
 });
 
@@ -196,7 +196,7 @@ document.getElementById('btn-load-full-document')?.addEventListener('change', as
       }
     }
 
-    await editorInstance.load(normalizeImportedDoc(data));
+    await docEngine.load(normalizeImportedDoc(data));
 
   } catch (err: any) {
 
@@ -214,7 +214,7 @@ document.getElementById('btn-load-full-document')?.addEventListener('change', as
 
 document.getElementById('btn-save-template')?.addEventListener('click', async () => {
 
-  await saveJson(await editorInstance.exportTemplate(), 'ophthalmology-template.json');
+  await saveJson(await docEngine.exportTemplate(), 'ophthalmology-template.json');
 
 });
 
@@ -242,7 +242,7 @@ document.getElementById('btn-load-template')?.addEventListener('change', async (
 
     if (!confirm('Load template? Current layout and field schemas will be replaced.')) return;
 
-    await editorInstance.load(normalizeImportedDoc(data));
+    await docEngine.load(normalizeImportedDoc(data));
 
   } catch (err: any) {
 
@@ -262,7 +262,7 @@ document.getElementById('btn-save-fields')?.addEventListener('click', async () =
 
   if (!(await ensureRequiredFieldsFilled())) return;
 
-  await saveJson(await editorInstance.exportFields(), 'ophthalmology-values.json');
+  await saveJson(await docEngine.exportFields(), 'ophthalmology-values.json');
 
 });
 
@@ -297,7 +297,7 @@ document.getElementById('btn-load-fields')?.addEventListener('change', async (e:
 
 
 
-    const doc = await editorInstance.getDocument();
+    const doc = await docEngine.getDocument();
 
     const values = normalizeDocumentValues(data, doc.blocks, doc.fieldSchemas);
 
@@ -311,7 +311,7 @@ document.getElementById('btn-load-fields')?.addEventListener('change', async (e:
 
     );
 
-    await editorInstance.load({
+    await docEngine.load({
 
       time: data.time ?? Date.now(),
 
@@ -339,7 +339,7 @@ document.getElementById('btn-edit-mapping')?.addEventListener('click', async () 
 
   try {
 
-    await editorInstance.openFieldMapping();
+    await docEngine.openFieldMapping();
 
   } catch (err: any) {
 
@@ -357,7 +357,7 @@ document.getElementById('btn-edit-mapping')?.addEventListener('click', async () 
 
 document.getElementById('btn-save-mapping')?.addEventListener('click', async () => {
   // Mapping is persisted inside the template JSON (fieldMapping), not as a separate file.
-  await saveJson(await editorInstance.exportTemplate(), 'ophthalmology-template.json');
+  await saveJson(await docEngine.exportTemplate(), 'ophthalmology-template.json');
 });
 
 document.getElementById('btn-load-mapping')?.addEventListener('change', async (e: any) => {
@@ -376,7 +376,7 @@ document.getElementById('btn-load-mapping')?.addEventListener('change', async (e
       alert('No fieldMapping found. Use a template JSON or a fieldMapping JSON file.');
       return;
     }
-    editorInstance.setFieldMapping(normalizeFieldMappingSpec(mapping));
+    docEngine.setFieldMapping(normalizeFieldMappingSpec(mapping));
     alert('Field mapping loaded. Save template to persist it with the template export.');
   } catch (err: any) {
     alert('Failed to load field mapping: ' + err.message);

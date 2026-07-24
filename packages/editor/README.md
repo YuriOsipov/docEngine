@@ -24,7 +24,7 @@ import '@docengine/editor/styles.css';
 // import '@docengine/editor/themes/bridge.css';
 // import '@docengine/editor/themes/prime.css';
 
-const editor = createEditor({
+const docEngine = createEditor({
   holder: '#editor',
   data: {
     time: Date.now(),
@@ -37,8 +37,8 @@ const editor = createEditor({
   },
 });
 
-await editor.ready;
-const doc = await editor.exportDoc();
+await docEngine.ready;
+const doc = await docEngine.exportDoc();
 ```
 
 ## API

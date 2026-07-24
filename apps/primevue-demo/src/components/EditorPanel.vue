@@ -54,13 +54,13 @@ const designMode = ref(false);
 
 
 
-let editor = null;
+let docEngine = null;
 
 
 
 onMounted(async () => {
   await nextTick();
-  editor = createEditor({
+  docEngine = createEditor({
 
     holder: holderEl.value,
 
@@ -84,9 +84,9 @@ onMounted(async () => {
 
   if (props.template) {
 
-    await editor.ready;
+    await docEngine.ready;
 
-    await editor.load(props.template);
+    await docEngine.load(props.template);
 
   }
 
@@ -102,9 +102,9 @@ onBeforeUnmount(() => {
 
   }
 
-  editor?.destroy();
+  docEngine?.destroy();
 
-  editor = null;
+  docEngine = null;
 
 });
 
@@ -116,11 +116,11 @@ watch(
 
   async (t) => {
 
-    if (!editor || !t) return;
+    if (!docEngine || !t) return;
 
-    await editor.ready;
+    await docEngine.ready;
 
-    await editor.load(t);
+    await docEngine.load(t);
 
   },
 
@@ -130,11 +130,11 @@ watch(
 
 async function onDesignModeChange(enabled) {
 
-  if (!editor) return;
+  if (!docEngine) return;
 
   try {
 
-    await editor.setDesignMode(!!enabled);
+    await docEngine.setDesignMode(!!enabled);
 
   } catch (err) {
 
@@ -160,11 +160,11 @@ async function onDesignModeChange(enabled) {
 
 async function exportPdf() {
 
-  if (!editor) return;
+  if (!docEngine) return;
 
   try {
 
-    await editor.exportPdf({ filename: 'document.pdf' });
+    await docEngine.exportPdf({ filename: 'document.pdf' });
 
     toast.add({ severity: 'success', summary: 'PDF exported', life: 2500 });
 
@@ -180,11 +180,11 @@ async function exportPdf() {
 
 async function exportFullDocument() {
 
-  if (!editor) return;
+  if (!docEngine) return;
 
   try {
 
-    const docExport = await editor.exportDoc();
+    const docExport = await docEngine.exportDoc();
 
     const blob = new Blob([JSON.stringify(docExport, null, 2)], { type: 'application/json' });
 
@@ -214,11 +214,11 @@ async function exportFullDocument() {
 
 async function exportTemplate() {
 
-  if (!editor) return;
+  if (!docEngine) return;
 
   try {
 
-    const templateExport = await editor.exportTemplate();
+    const templateExport = await docEngine.exportTemplate();
 
     const blob = new Blob([JSON.stringify(templateExport, null, 2)], { type: 'application/json' });
 

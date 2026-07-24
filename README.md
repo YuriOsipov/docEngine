@@ -56,9 +56,11 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  Demos["Vite demos"] --> Editor["editor + field-date"]
+  Demos["Vite demos"] --> Editor["editor"]
+  Demos --> Date["field-date"]
   SF["Salesforce LWCs"] --> Bundle["DocEngineBundle"]
   Bundle --> Editor
+  Bundle --> Date
   N8N["n8n node"] --> Engine["engine"]
   N8N --> PDF["pdf-renderer"]
   PdfSvc["pdf-service"] --> PDF
@@ -149,7 +151,7 @@ Copy `.env.example` to `.env` if you need image upload configuration:
 import { createEditor } from '@docengine/editor';
 import '@docengine/editor/styles.css';
 
-const editor = createEditor({
+const docEngine = createEditor({
   holder: '#editor',
   data: {
     time: Date.now(),
@@ -162,8 +164,8 @@ const editor = createEditor({
   },
 });
 
-await editor.ready;
-const doc = await editor.exportDoc();
+await docEngine.ready;
+const doc = await docEngine.exportDoc();
 ```
 
 Optional theme bridges:

@@ -380,9 +380,9 @@ Adapter helpers: `buildSectionedDocumentFromValues`, `expandSectionedDocument`, 
 |----------|-------|-------------------|
 | `normalizeImportedDoc(data)` | document or template JSON | `EditorDocument` |
 | `applyDocumentValues(blocks, values, fieldSchemas)` | blocks + field values | `{ blocks, fieldSchemas, applied, skipped }` |
-| `editor.load(data)` | document \| template \| field values | Re-inits editor |
+| `docEngine.load(data)` | document \| template \| field values | Re-inits editor |
 
-**`editor.load` rules:**
+**`docEngine.load` rules:**
 - `kind: 'document'` (with `blocks`), `kind: 'template'`, or raw `{ blocks, fieldSchemas }` → full replace
 - `kind: 'field'`, or legacy values-only `kind: 'document'` (no `blocks`) → merge via `normalizeDocumentValues` then `applyDocumentValues`; accepts v2 `sections` or v1 flat `values`
 
@@ -846,9 +846,9 @@ Read-only DOM: hides empty fields, labels, and adjacent punctuation. Used intern
 - **Tables:** `table` segments render as vision tables in preview and PDF. Omitted when no cell has a value after filtering.
 - **Collapse:** `collapsed` is not applied in preview; body content is always shown expanded when present.
 
-**Preview modal:** `editor.preview()` opens a modal that generates a PDF (via html2canvas + jsPDF) and displays it in an embedded viewer. A **Save PDF** icon button opens the native system save dialog (`showSaveFilePicker` when available).
+**Preview modal:** `docEngine.preview()` opens a modal that generates a PDF (via html2canvas + jsPDF) and displays it in an embedded viewer. A **Save PDF** icon button opens the native system save dialog (`showSaveFilePicker` when available).
 
-**PDF export:** `generateDocumentPdfBlob(doc, options?)`, `exportDocumentPdf(doc, options?)`, and `editor.exportPdf(options?)` generate PDF from the same filtered preview DOM. Options: `filename` (default `document.pdf`), `format` (`a4` | `letter`), `margin` (mm), optional `title`, `download` (default `true`). Saves use the native system save dialog via `saveBlobToDisk()`.
+**PDF export:** `generateDocumentPdfBlob(doc, options?)`, `exportDocumentPdf(doc, options?)`, and `docEngine.exportPdf(options?)` generate PDF from the same filtered preview DOM. Options: `filename` (default `document.pdf`), `format` (`a4` | `letter`), `margin` (mm), optional `title`, `download` (default `true`). Saves use the native system save dialog via `saveBlobToDisk()`.
 
 - Remote images without CORS headers may appear blank in the PDF.
 
@@ -1176,7 +1176,7 @@ import {
 } from '@docengine/editor';
 import '@docengine/editor/styles.css';
 
-const editor = createEditor({
+const docEngine = createEditor({
   holder: '#editor',
   data: {
     time: Date.now(),
@@ -1198,10 +1198,10 @@ const editor = createEditor({
   onChange: (doc) => console.log('changed', doc),
 });
 
-await editor.ready;
+await docEngine.ready;
 
 document.querySelector('#save').onclick = async () => {
-  const json = await editor.exportDoc();
+  const json = await docEngine.exportDoc();
   console.log(json.kind, json.version); // 'document', 2
 };
 ```
