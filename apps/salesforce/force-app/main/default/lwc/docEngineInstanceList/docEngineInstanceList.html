@@ -1,0 +1,69 @@
+<template>
+  <lightning-card title="DocEngine Documents" icon-name="standard:document">
+    <div slot="actions">
+      <lightning-button
+        label="New"
+        variant="brand"
+        onclick={handleNew}
+        disabled={busy}
+      ></lightning-button>
+      <lightning-button
+        class="slds-m-left_x-small"
+        label="Refresh"
+        onclick={handleRefresh}
+        disabled={busy}
+      ></lightning-button>
+    </div>
+
+    <div class="slds-p-around_small">
+      <template if:true={errorMessage}>
+        <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+          <span>{errorMessage}</span>
+        </div>
+      </template>
+
+      <template if:true={showPicker}>
+        <div class="picker-row slds-m-bottom_small">
+          <lightning-combobox
+            label="Template"
+            value={selectedTemplateId}
+            options={templateOptions}
+            placeholder={templatePlaceholder}
+            onchange={handleTemplateChange}
+            disabled={templatesLoading}
+          ></lightning-combobox>
+          <div class="slds-m-top_small">
+            <lightning-button label="Cancel" onclick={handleCancelPicker} disabled={busy}></lightning-button>
+            <lightning-button
+              class="slds-m-left_x-small"
+              label="Continue"
+              variant="brand"
+              onclick={handleContinue}
+              disabled={continueDisabled}
+            ></lightning-button>
+          </div>
+        </div>
+      </template>
+
+      <template if:true={showEmpty}>
+        <p class="slds-text-body_regular slds-text-color_weak">
+          No saved documents for this record yet. Click New to generate one.
+        </p>
+      </template>
+
+      <template if:true={showTable}>
+        <lightning-datatable
+          key-field="id"
+          data={rows}
+          columns={columns}
+          hide-checkbox-column
+          onrowaction={handleRowAction}
+        ></lightning-datatable>
+      </template>
+
+      <template if:true={busy}>
+        <lightning-spinner alternative-text="Working" size="small"></lightning-spinner>
+      </template>
+    </div>
+  </lightning-card>
+</template>

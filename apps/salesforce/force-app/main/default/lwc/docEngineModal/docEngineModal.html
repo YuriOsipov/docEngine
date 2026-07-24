@@ -1,0 +1,57 @@
+<template>
+  <lightning-modal-header label={templateName}></lightning-modal-header>
+
+  <lightning-modal-body>
+    <div class="doc-shell">
+      <template if:true={errorMessage}>
+        <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+          <span>{errorMessage}</span>
+        </div>
+      </template>
+
+      <template if:true={showSpinner}>
+        <div class="waiting-row">
+          <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+          <p class="slds-text-body_small slds-text-color_weak">Loading…</p>
+        </div>
+      </template>
+
+      <template if:true={showEditor}>
+        <!-- Format panel — always visible on top -->
+        <div class="chrome-row">
+          <div lwc:dom="manual" class="doc-editor-host__sticky sticky-chrome"></div>
+          <div lwc:dom="manual" class="doc-editor-host__actions doc-actions"></div>
+        </div>
+
+        <!-- Document — the only scroller -->
+        <div
+          lwc:dom="manual"
+          class="doc-editor-root doc-editor-host doc-editor-host__surface editor-root"
+        ></div>
+      </template>
+
+      <c-doc-engine-share-dialog></c-doc-engine-share-dialog>
+    </div>
+  </lightning-modal-body>
+
+  <lightning-modal-footer>
+    <div class="footer-row">
+      <lightning-button-group>
+        <lightning-button label="Cancel" onclick={handleCancel} disabled={busy}></lightning-button>
+        <template if:true={showSaveDraft}>
+          <lightning-button
+            label="Save Draft"
+            onclick={handleSaveDraft}
+            disabled={busy}
+          ></lightning-button>
+        </template>
+        <lightning-button
+          variant="brand"
+          label="Finish"
+          onclick={handleFinish}
+          disabled={busy}
+        ></lightning-button>
+      </lightning-button-group>
+    </div>
+  </lightning-modal-footer>
+</template>

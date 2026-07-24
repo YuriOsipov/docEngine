@@ -1,0 +1,33 @@
+<template>
+  <lightning-card title="Document" icon-name="standard:note">
+    <div class="slds-p-around_medium">
+      <!-- Zone 1: SLDS page chrome -->
+      <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_small">
+        <lightning-input
+          type="toggle"
+          label="Design mode"
+          checked={designMode}
+          onchange={handleDesignToggle}
+        ></lightning-input>
+
+        <lightning-button-group>
+          <lightning-button label="Import" onclick={handleImport}></lightning-button>
+          <lightning-button label="Export" onclick={handleExport}></lightning-button>
+          <lightning-button label="Save" variant="brand" onclick={handleSave}></lightning-button>
+        </lightning-button-group>
+
+        <!-- Document actions (preview/PDF) injected here by createEditor -->
+        <div lwc:dom="manual" class="doc-editor-host__actions doc-actions"></div>
+      </div>
+
+      <!-- Sticky palette + format toolbar (ui.chromeParent) -->
+      <div lwc:dom="manual" class="doc-editor-host__sticky sticky-chrome"></div>
+
+      <!-- Zone 2: editor mount -->
+      <div
+        lwc:dom="manual"
+        class="doc-editor-root doc-editor-host doc-editor-host__surface editor-root"
+      ></div>
+    </div>
+  </lightning-card>
+</template>

@@ -1,0 +1,40 @@
+{
+  "name": "n8n-nodes-docengine",
+  "version": "0.1.0",
+  "description": "Generate HTML/PDF documents from editor templates in n8n workflows",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "nodes"
+  ],
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "pdf",
+    "html",
+    "document",
+    "template"
+  ],
+  "license": "MIT",
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/DocEngine/DocEngine.node.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test dist/nodes/DocEngine/docengine-utils.test.js"
+  },
+  "dependencies": {
+    "@docengine/engine": "1.0.0",
+    "@docengine/pdf-renderer": "1.0.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": ">=1.0.0"
+  }
+}

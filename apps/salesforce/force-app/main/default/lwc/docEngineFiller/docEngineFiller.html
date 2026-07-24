@@ -1,0 +1,72 @@
+<template>
+  <lightning-card title="Fill document" icon-name="standard:form">
+    <div class="slds-p-around_medium">
+      <template if:true={objectApiName}>
+        <p class="slds-m-bottom_x-small slds-text-body_small slds-text-color_weak">
+          Object: {objectApiName}
+        </p>
+      </template>
+
+      <div class="picker-row">
+        <lightning-combobox
+          label="Template"
+          value={selectedTemplateId}
+          options={templateOptions}
+          placeholder={templatePlaceholder}
+          onchange={handleTemplateChange}
+          disabled={templatesLoading}
+        ></lightning-combobox>
+        <lightning-button
+          label="Load"
+          variant="brand"
+          onclick={handleLoadTemplate}
+          disabled={loadDisabled}
+        ></lightning-button>
+      </div>
+
+      <template if:true={showEditor}>
+        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_small toolbar-row">
+          <lightning-combobox
+            label="Status"
+            value={status}
+            options={statusOptions}
+            onchange={handleStatusChange}
+            class="slds-size_small"
+          ></lightning-combobox>
+          <lightning-button-group>
+            <lightning-button
+              label="Re-merge from record"
+              onclick={handleRemerge}
+              disabled={editorBusy}
+            ></lightning-button>
+            <lightning-button
+              label="Save"
+              variant="brand"
+              onclick={handleSave}
+              disabled={editorBusy}
+            ></lightning-button>
+            <lightning-button
+              label="Save + PDF"
+              variant="brand-outline"
+              onclick={handleSaveAndPdf}
+              disabled={savePdfDisabled}
+              title={savePdfTitle}
+            ></lightning-button>
+          </lightning-button-group>
+          <div lwc:dom="manual" class="doc-editor-host__actions doc-actions"></div>
+        </div>
+
+        <div lwc:dom="manual" class="doc-editor-host__sticky sticky-chrome"></div>
+        <div
+          lwc:dom="manual"
+          class="doc-editor-root doc-editor-host doc-editor-host__surface editor-root"
+        ></div>
+      </template>
+
+      <template if:true={statusMessage}>
+        <p class="slds-m-top_small slds-text-body_small slds-text-color_weak">{statusMessage}</p>
+      </template>
+    </div>
+  </lightning-card>
+  <c-doc-engine-share-dialog></c-doc-engine-share-dialog>
+</template>

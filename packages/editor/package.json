@@ -1,0 +1,52 @@
+{
+  "name": "@docengine/editor",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./lib/index.js",
+  "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./node": {
+      "types": "./lib/node.d.ts",
+      "import": "./lib/node.js"
+    },
+    "./styles.css": "./src/styles/editor.css",
+    "./themes/bridge.css": "./src/themes/bridge.css",
+    "./themes/prime.css": "./src/themes/prime.css",
+    "./themes/slds.css": "./src/themes/slds.css",
+    "./themes/lwc.css": "./dist/editor-lwc.css",
+    "./dist": "./dist/editor.js",
+    "./ui/wire-modal-palette": {
+      "types": "./lib/ui/wire-modal-palette.d.ts",
+      "import": "./lib/ui/wire-modal-palette.js"
+    }
+  },
+  "peerDependencies": {
+    "@editorjs/editorjs": "^2.30.8"
+  },
+  "dependencies": {
+    "@docengine/engine": "1.0.0",
+    "@docengine/pdf-renderer": "1.0.0",
+    "@fontsource/inter": "^5.2.8",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "files": [
+    "src",
+    "lib",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test lib/core/document-io.test.js lib/core/document-history.test.js lib/core/page-setup-styles.test.js lib/core/field-schemas.test.js lib/core/document-section-defaults.test.js lib/core/repeater-io.test.js lib/core/field-io/table-field-io.test.js lib/core/field-io/sectioned-document-io.test.js lib/core/field-id.test.js lib/core/formula-field-index.test.js lib/core/computed-formula.test.js lib/core/segment-tree.test.js lib/fields/field-display-style.test.js lib/fields/field-keyboard.test.js lib/fields/inline-field-from-selection.test.js lib/fields/fill-defaults.test.js lib/fields/heading-line-breaks.test.js lib/fields/document-preview.test.js lib/fields/table-field.test.js lib/fields/wire-table-column-resize.test.js lib/fields/wire-columns-resize.test.js lib/fields/handlers/registry.test.js lib/export/preview-pdf-parity.test.js lib/export/preview-html-styles.test.js lib/fields/manual-field-values.test.js lib/fields/cross-section-reposition.test.js lib/design/formula-field-picker.test.js lib/ui/tree-modal.test.js lib/ui/list-modal.test.js lib/ui/modal-picker-keyboard.test.js lib/ui/mapping-result-helper.test.js lib/ui/field-mapping-badges.test.js lib/utils/export-filename.test.js"
+  },
+  "devDependencies": {
+    "@docengine/field-date": "1.0.0",
+    "linkedom": "^0.18.12"
+  }
+}

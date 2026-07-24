@@ -1,0 +1,221 @@
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  color: #1e293b;
+  background: #f8fafc;
+}
+
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: var(--me-space-4, 16px);
+}
+
+/* Fill mode: window follows Page Setup size/orientation (+10% via --doc-page-*) */
+.page.page--fill-page,
+.page:has(.editor-holder--fill-page) {
+  max-width: min(100%, calc(var(--doc-page-width, 231mm) + 4rem));
+}
+
+body.design-mode--panels .page,
+.page:has(> .design-shell:not(.design-shell--active)) {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  height: 100vh;
+  overflow: hidden;
+  padding: var(--me-space-3, 12px) var(--me-space-4, 16px) var(--me-space-4, 16px);
+  box-sizing: border-box;
+}
+
+body.design-mode--panels .page > .design-shell--active,
+.page > .design-shell:not(.design-shell--active) {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--me-space-4, 16px);
+  margin-bottom: var(--me-space-3, 12px);
+  flex-wrap: wrap;
+}
+
+.page-sticky-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #f8fafc;
+  padding-bottom: var(--me-space-2, 8px);
+}
+
+.page-sticky-chrome .page-header {
+  margin-bottom: var(--me-space-2, 8px);
+}
+
+.page-sticky-chrome .editor-top-chrome {
+  margin-bottom: 0;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.page-actions {
+  display: flex;
+  gap: var(--me-space-3, 12px);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.page-actions__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--me-space-3, 12px);
+  padding-right: var(--me-space-3, 12px);
+  border-right: 1px solid #e2e8f0;
+}
+
+.design-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.design-toggle:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.page-actions__io {
+  display: inline-flex;
+  gap: var(--me-space-2, 8px);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.page-actions__document {
+  display: inline-flex;
+  align-items: center;
+  padding-left: var(--me-space-3, 12px);
+  border-left: 1px solid #e2e8f0;
+}
+
+.page-actions__document .document-actions__btn--icon {
+  color: #64748b;
+  border: none;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.page-actions__document .document-actions__btn--icon:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.io-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--me-space-1, 4px);
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--me-radius-sm, 6px);
+  background: transparent;
+}
+
+.io-group__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.page-actions__io .btn-icon,
+.page-actions__io label.btn-icon {
+  color: #64748b;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.page-actions__io .btn-icon:hover:not(:disabled),
+.page-actions__io label.btn-icon:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.page-actions__io .btn-secondary.btn-icon {
+  border: none;
+}
+
+.page-actions__io #btn-edit-mapping {
+  border: 1px solid #e2e8f0;
+  border-radius: var(--me-radius-sm, 6px);
+  color: #64748b;
+  background: transparent;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.page-actions__io #btn-edit-mapping:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.editor-holder {
+  background: #fff;
+  border: none;
+  border-radius: var(--me-radius-md, 6px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  min-height: 200px;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--me-radius-sm, 6px);
+  color: #64748b;
+  border: none;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

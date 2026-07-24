@@ -1,0 +1,35 @@
+{
+  "name": "@docengine/field-date",
+  "version": "1.0.0",
+  "description": "Reference DocEngine field plugin for the date field type",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@docengine/editor": "1.0.0",
+    "@docengine/engine": "1.0.0"
+  },
+  "dependencies": {
+    "@docengine/engine": "1.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test dist/date-field.test.js"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.12"
+  }
+}

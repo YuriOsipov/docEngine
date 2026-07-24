@@ -1,0 +1,14 @@
+node_modules/
+dist/
+packages/*/dist/
+packages/*/lib/
+apps/*/dist/
+*.tsbuildinfo
+.DS_Store
+.env
+*.log
+.sfdx/
+.sf/
+.tmp-retrieve/
+.cursor/
+build-errors.txt

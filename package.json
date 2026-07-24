@@ -1,0 +1,31 @@
+{
+  "name": "doc-engine",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w ophthalmology-demo",
+    "dev:pdf": "npm run dev -w pdf-service",
+    "dev:primevue": "npm run dev -w primevue-demo",
+    "build": "npm run build:lib && npm run build -w ophthalmology-demo",
+    "build:lib": "vite build && node scripts/build-lwc-styles.mjs",
+    "build:sf": "node scripts/build-sf.mjs",
+    "build:demo": "npm run build -w ophthalmology-demo",
+    "preview": "npm run preview -w ophthalmology-demo",
+    "typecheck": "tsc -b",
+    "test": "npm run test -w @docengine/engine && npm run test -w @docengine/field-date && npm run test -w @docengine/editor && npm run test -w @docengine/pdf-renderer && npm run test -w n8n-nodes-docengine",
+    "test:pdf": "npm run test -w @docengine/pdf-renderer"
+  },
+  "dependencies": {
+    "@editorjs/editorjs": "^2.30.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

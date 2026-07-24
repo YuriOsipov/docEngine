@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Use DocEngine PDF connector (callout to pdf-service via Named Credential).</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>DocEngine PDF User</label>
+    <classAccesses>
+        <apexClass>DocEnginePdfCallout</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>DocEnginePdfController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+</PermissionSet>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AuraDefinitionBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <description>Overrides standard New on DocEngine_Template__c — opens create form, then the builder record page.</description>
+</AuraDefinitionBundle>

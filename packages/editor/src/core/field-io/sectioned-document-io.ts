@@ -1,0 +1,15 @@
+export {
+  isSectionInstanceArray,
+  findRepeatableSectionBlock,
+  isRepeatableSectionName,
+  expandSectionFieldMap,
+  buildSectionedDocumentFromValues,
+  filterEmptySections,
+  expandSectionedDocument,
+  extractRepeatableSectionInstances,
+  buildRepeatableInstancesFromEditor,
+  resolveRepeatableSectionInstances,
+  findAdjacentTableBlock,
+  resolveRepeatablePagePlan,
+  ROOT_SECTION_KEY,
+} from '@docengine/engine';

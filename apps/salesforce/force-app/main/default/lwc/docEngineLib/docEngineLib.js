@@ -1,0 +1,689 @@
+/**
+ * Shared DocEngine Static Resource loader + editor factory for LWCs.
+ * Import: import { ensureDocEngineAssets, createDocEditor, emptyDocument } from 'c/docEngineLib';
+ */
+import { loadStyle, loadScript } from 'lightning/platformResourceLoader';
+import editorCss from '@salesforce/resourceUrl/DocEngineCss';
+import editorJs from '@salesforce/resourceUrl/DocEngineBundle';
+import pdfViewer from '@salesforce/resourceUrl/DocEnginePdfViewer';
+import isPdfAvailable from '@salesforce/apex/DocEnginePdfController.isAvailable';
+import getPdfProvider from '@salesforce/apex/DocEnginePdfController.getPdfProvider';
+import generatePdfBase64 from '@salesforce/apex/DocEnginePdfController.generatePdfBase64';
+
+const assetsByComponent = new WeakMap();
+let cachedPdfProvider = null;
+
+export function emptyDocument() {
+  return {
+    time: Date.now(),
+    fieldSchemas: {},
+    blocks: []
+  };
+}
+
+/**
+ * Load DocEngineCss + DocEngineBundle once per component instance.
+ * @param {LightningElement} component
+ */
+export async function ensureDocEngineAssets(component) {
+  if (assetsByComponent.get(component)) {
+    return;
+  }
+  // LWS-safe PDF preview: pdf.js runs inside this Static Resource iframe.
+  window.__DOCENGINE_PDF_VIEWER_URL__ = `${pdfViewer}/viewer.html`;
+  await Promise.all([loadStyle(component, editorCss), loadScript(component, editorJs)]);
+  assetsByComponent.set(component, true);
+}
+
+/**
+ * @returns {typeof window.DocEditor.createEditor}
+ */
+export function getCreateEditor() {
+  const createEditor = window.DocEditor && window.DocEditor.createEditor;
+  if (typeof createEditor !== 'function') {
+    throw new Error(
+      'DocEditor.createEditor not found on window.DocEditor. Run npm run build:sf and deploy DocEngineBundle.'
+    );
+  }
+  return createEditor;
+}
+
+/**
+ * Convert Apex base64 PDF to a Blob for the editor preview / download.
+ * @param {string} base64
+ * @returns {Blob}
+ */
+export function base64ToPdfBlob(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+/**
+ * True when the active PDF provider can generate (Salesforce always; External needs DocEngine_PDF).
+ */
+export async function checkPdfAvailable() {
+  try {
+    return !!(await isPdfAvailable());
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Salesforce | External (from DocEngine_Settings__c.Use_External_PDF__c).
+ */
+export async function resolvePdfProvider() {
+  if (cachedPdfProvider) {
+    return cachedPdfProvider;
+  }
+  try {
+    cachedPdfProvider = (await getPdfProvider()) || 'Salesforce';
+  } catch (e) {
+    cachedPdfProvider = 'Salesforce';
+  }
+  return cachedPdfProvider;
+}
+
+function apexErrorMessage(err) {
+  return (
+    (err &&
+      err.body &&
+      (err.body.message ||
+        (err.body.pageErrors && err.body.pageErrors[0] && err.body.pageErrors[0].message))) ||
+    (err && err.message) ||
+    String(err)
+  );
+}
+
+function withPdfHint(message) {
+  const hint =
+    /not installed|DocEngine PDF|External PDF|pdf\.example\.com|Timed out|Unauthorized endpoint|CalloutException|Unable to connect|DNS|Unknown host|404|503|502/i.test(
+      message
+    )
+      ? ' See Setup → Custom Settings → DocEngine Settings, or integrations/salesforce/PDF_PACKAGE.md.'
+      : '';
+  return (message || 'PDF generation failed.') + hint;
+}
+
+/**
+ * Build standalone HTML for Salesforce Blob.toPdf from document JSON.
+ * @param {object} doc
+ * @param {object} [options]
+ * @returns {string}
+ */
+export function buildHtmlFromDocument(doc, options = {}) {
+  const DocEditor = typeof window !== 'undefined' ? window.DocEditor : null;
+  if (DocEditor && typeof DocEditor.buildPreviewHtmlDocument === 'function') {
+    return DocEditor.buildPreviewHtmlDocument(doc, options);
+  }
+  const title = String((options && options.title) || 'document').replace(/</g, '&lt;');
+  return (
+    '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>' +
+    title +
+    '</title></head><body><pre>' +
+    String(JSON.stringify(doc || {}, null, 2)).replace(/</g, '&lt;') +
+    '</pre></body></html>'
+  );
+}
+
+const SF_PDF_EXTRA_CSS = `
+/* Salesforce Blob.toPdf — old-school layout helpers */
+table.sf-pdf-columns {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
+  border: none;
+  margin: 0.5em 0;
+}
+table.sf-pdf-columns > tbody > tr > td,
+table.sf-pdf-columns > tr > td {
+  vertical-align: top;
+  padding: 0 8px 0 0;
+  word-wrap: break-word;
+  white-space: normal;
+  border: none;
+}
+table.sf-pdf-columns > tbody > tr > td:last-child,
+table.sf-pdf-columns > tr > td:last-child {
+  padding-right: 0;
+  padding-left: 8px;
+}
+table.vision-table,
+table.sf-pdf-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
+}
+table.vision-table th,
+table.vision-table td,
+table.sf-pdf-table th,
+table.sf-pdf-table td {
+  word-wrap: break-word;
+  white-space: normal;
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+.document-columns__toolbar,
+.document-columns__col-resizer,
+.document-table__toolbar,
+.vision-table__col-resizer,
+.vision-table__row-actions,
+.document-table__row-actions {
+  display: none !important;
+}
+`.trim();
+
+function parsePercentWidth(raw, fallback) {
+  if (raw == null || raw === '') return fallback;
+  const s = String(raw).trim();
+  const m = s.match(/^([\d.]+)\s*%?$/);
+  if (m) {
+    const n = Number(m[1]);
+    if (!Number.isNaN(n) && n > 0) return Math.min(100, n) + '%';
+  }
+  if (/fr$/i.test(s)) {
+    // Treat "1fr 2fr"-style single token as equal share later
+    return fallback;
+  }
+  return fallback;
+}
+
+function columnWidthsFromGrid(grid, colCount) {
+  const wrapper = grid.closest && grid.closest('.document-columns');
+  const w0 = wrapper && wrapper.dataset ? wrapper.dataset.columnWidth0 : null;
+  const w1 = wrapper && wrapper.dataset ? wrapper.dataset.columnWidth1 : null;
+  if (colCount === 2 && (w0 || w1)) {
+    const a = parsePercentWidth(w0, '50%');
+    const b = parsePercentWidth(w1, '50%');
+    return [a, b];
+  }
+  const style = grid.getAttribute('style') || '';
+  const tracks = style.match(/grid-template-columns\s*:\s*([^;]+)/i);
+  if (tracks) {
+    const parts = tracks[1].trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= colCount) {
+      const nums = parts.slice(0, colCount).map((p) => {
+        const fr = p.match(/^([\d.]+)fr$/i);
+        if (fr) return Number(fr[1]) || 1;
+        const pct = p.match(/^([\d.]+)%$/);
+        if (pct) return Number(pct[1]) || 1;
+        return 1;
+      });
+      const sum = nums.reduce((a, b) => a + b, 0) || colCount;
+      return nums.map((n) => Math.round((n / sum) * 1000) / 10 + '%');
+    }
+  }
+  const equal = Math.round((100 / colCount) * 10) / 10 + '%';
+  return Array.from({ length: colCount }, () => equal);
+}
+
+function moveChildren(fromEl, toEl) {
+  while (fromEl.firstChild) {
+    toEl.appendChild(fromEl.firstChild);
+  }
+}
+
+/**
+ * Rewrite CSS-grid columns → HTML tables and harden data tables for Blob.toPdf.
+ * Browser preview / External pdf-service should NOT use this.
+ * @param {string} html
+ * @returns {string}
+ */
+export function normalizeHtmlForSalesforcePdf(html) {
+  if (!html || typeof html !== 'string') {
+    return html;
+  }
+  if (typeof DOMParser === 'undefined') {
+    return html;
+  }
+
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(html, 'text/html');
+  } catch (e) {
+    return html;
+  }
+  if (!doc || !doc.body) {
+    return html;
+  }
+
+  // Drop design chrome that should never print
+  doc
+    .querySelectorAll(
+      '.document-columns__toolbar, .document-columns__col-resizer, .document-table__toolbar, .vision-table__col-resizer, .vision-table__row-actions, .document-table__row-actions'
+    )
+    .forEach((el) => el.remove());
+
+  // CSS Grid columns → 1-row HTML table (Salesforce PDF ignores display:grid)
+  doc.querySelectorAll('.document-columns__grid').forEach((grid) => {
+    const cols = Array.from(grid.children).filter(
+      (el) => el.classList && el.classList.contains('document-columns__col')
+    );
+    if (!cols.length) {
+      return;
+    }
+    const widths = columnWidthsFromGrid(grid, cols.length);
+    const table = doc.createElement('table');
+    table.className = 'sf-pdf-columns';
+    table.setAttribute('width', '100%');
+    table.setAttribute('cellpadding', '0');
+    table.setAttribute('cellspacing', '0');
+    table.setAttribute('border', '0');
+    table.style.cssText = 'width:100%;table-layout:fixed;border-collapse:collapse;border:none;';
+
+    const tr = doc.createElement('tr');
+    cols.forEach((col, i) => {
+      const td = doc.createElement('td');
+      const w = widths[i] || Math.round(100 / cols.length) + '%';
+      td.setAttribute('width', w);
+      td.setAttribute('valign', 'top');
+      td.style.cssText =
+        'width:' +
+        w +
+        ';vertical-align:top;word-wrap:break-word;white-space:normal;padding:0 8px 0 0;border:none;';
+      if (i === cols.length - 1) {
+        td.style.paddingRight = '0';
+        td.style.paddingLeft = '8px';
+      }
+      moveChildren(col, td);
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+
+    const parent = grid.parentNode;
+    if (parent) {
+      parent.replaceChild(table, grid);
+    }
+  });
+
+  // Product / vision tables: fixed layout + equal or colgroup-based % widths
+  doc.querySelectorAll('table.vision-table, table.document-table').forEach((table) => {
+    table.classList.add('sf-pdf-table');
+    table.setAttribute('width', '100%');
+    table.style.tableLayout = 'fixed';
+    table.style.width = '100%';
+
+    const colgroup = table.querySelector('colgroup');
+    const cols = colgroup ? Array.from(colgroup.querySelectorAll('col')) : [];
+    const headerCells = table.querySelectorAll('thead tr:first-child > th, thead tr:first-child > td');
+    const firstRowCells =
+      headerCells.length > 0
+        ? headerCells
+        : table.querySelectorAll('tr:first-child > th, tr:first-child > td');
+    const n = firstRowCells.length || cols.length;
+    if (!n) {
+      return;
+    }
+
+    let widths = [];
+    if (cols.length === n) {
+      widths = cols.map((col, i) => {
+        const styleW = (col.getAttribute('style') || '').match(/width\s*:\s*([^;]+)/i);
+        const attrW = col.getAttribute('width');
+        return parsePercentWidth(styleW ? styleW[1] : attrW, null) || null;
+      });
+      if (widths.some((w) => !w)) {
+        const equal = Math.round((100 / n) * 10) / 10 + '%';
+        widths = widths.map((w) => w || equal);
+      }
+    } else {
+      const equal = Math.round((100 / n) * 10) / 10 + '%';
+      widths = Array.from({ length: n }, () => equal);
+    }
+
+    firstRowCells.forEach((cell, i) => {
+      const w = widths[i];
+      if (!w) return;
+      cell.setAttribute('width', w);
+      cell.style.width = w;
+      cell.style.wordWrap = 'break-word';
+      cell.style.whiteSpace = 'normal';
+      cell.style.verticalAlign = 'top';
+    });
+
+    table.querySelectorAll('th, td').forEach((cell) => {
+      cell.style.wordWrap = 'break-word';
+      cell.style.whiteSpace = 'normal';
+      if (!cell.style.verticalAlign) {
+        cell.style.verticalAlign = 'top';
+      }
+    });
+  });
+
+  // Soft wrap after - / in long tokens (helps codes like 1.2-0.6)
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+  textNodes.forEach((node) => {
+    const parent = node.parentElement;
+    if (!parent || /^(SCRIPT|STYLE|TEXTAREA)$/i.test(parent.tagName)) {
+      return;
+    }
+    const v = node.nodeValue;
+    if (!v || v.length < 10) {
+      return;
+    }
+    if (!/[\-\/]/.test(v)) {
+      return;
+    }
+    // Insert zero-width space after hyphen/slash to allow breaks without changing visible text
+    node.nodeValue = v.replace(/([^\s])([\-\/])(?=[^\s])/g, '$1$2\u200b');
+  });
+
+  // Inject SF PDF CSS (append so it overrides conflicting modern rules)
+  let head = doc.head;
+  if (!head) {
+    head = doc.createElement('head');
+    if (doc.documentElement) {
+      doc.documentElement.insertBefore(head, doc.body);
+    }
+  }
+  const style = doc.createElement('style');
+  style.setAttribute('data-docengine-sf-pdf', '1');
+  style.textContent = SF_PDF_EXTRA_CSS;
+  head.appendChild(style);
+
+  const doctype = '<!DOCTYPE html>\n';
+  return doctype + doc.documentElement.outerHTML;
+}
+
+/**
+ * PDF via active provider: Salesforce (HTML→Blob.toPdf) or External (pdf-service callout).
+ * @param {object} doc
+ * @param {object} [options]
+ */
+export async function generatePdfBlobFromApex(doc, options = {}) {
+  try {
+    const provider = await resolvePdfProvider();
+    const documentJson = JSON.stringify(doc);
+    let html = options && options.html;
+    if (provider === 'Salesforce') {
+      if (!html) {
+        html = buildHtmlFromDocument(doc, options);
+      }
+      html = normalizeHtmlForSalesforcePdf(html);
+    }
+    const base64 = await generatePdfBase64({ documentJson, html: html || null });
+    if (!base64) {
+      throw new Error('PDF service returned an empty response.');
+    }
+    return base64ToPdfBlob(base64);
+  } catch (err) {
+    throw new Error(withPdfHint(apexErrorMessage(err)));
+  }
+}
+
+/**
+ * HTML for Save + PDF when using Salesforce provider (prefer live editor export).
+ * Applies Salesforce PDF HTML normalization (columns→table, fixed tables).
+ * @param {object} editor
+ * @param {{ title?: string, hideEmptyValues?: boolean }} [opts]
+ */
+export async function exportHtmlForPdf(editor, opts = {}) {
+  const title = opts.title || 'document';
+  const hideEmptyValues = !!opts.hideEmptyValues;
+  let html;
+  if (editor && typeof editor.exportPreviewHtml === 'function') {
+    html = await editor.exportPreviewHtml({ hideEmptyValues, title });
+  } else if (editor && typeof editor.exportDoc === 'function') {
+    const doc = await editor.exportDoc();
+    html = buildHtmlFromDocument(doc, { title, hideEmptyValues });
+  } else {
+    html = buildHtmlFromDocument({}, { title });
+  }
+  return normalizeHtmlForSalesforcePdf(html);
+}
+
+/**
+ * Templates that use commonListId / commonTreeId (e.g. Ophthalmology Examination)
+ * need shared catalogs. Prefer explicit options.catalogs; otherwise supply
+ * ophthalmology catalogs from the DocEngineBundle when the document schemas need them.
+ * @param {object} options
+ */
+function resolveCatalogs(options = {}) {
+  if (options.catalogs) {
+    return options.catalogs;
+  }
+  const schemas = Object.values((options.data && options.data.fieldSchemas) || {});
+  const needsCatalog = schemas.some((s) => s && (s.commonListId || s.commonTreeId));
+  const bundled =
+    typeof window !== 'undefined' &&
+    window.DocEditor &&
+    window.DocEditor.ophthalmologyCatalogs;
+  if (needsCatalog && bundled) {
+    return bundled;
+  }
+  return { lists: {}, trees: {} };
+}
+
+/**
+ * Mount createEditor with Lightning-friendly chrome defaults.
+ * Pass generatePdfBlob only when DocEngine_PDF is installed (use resolveCreateDocEditorOptions).
+ * Date field type is registered in DocEngineBundle; pickers.openDatePicker is supplied here.
+ */
+export function createDocEditor(options) {
+  const createEditor = getCreateEditor();
+  const {
+    holder,
+    chromeParent,
+    documentActionsContainer,
+    designMode = false,
+    data,
+    catalogs: _catalogsIgnored,
+    resolveListItems,
+    remoteListCollections,
+    remoteListLabelFields,
+    generatePdfBlob = null,
+    pdfAvailable,
+    onChange,
+    onShareDocument,
+    onPreviewStateChange,
+    ui: uiOptions,
+    fieldValueStyle: fieldValueStyleOptions,
+    pickers: pickersOptions,
+    ...rest
+  } = options;
+
+  const datePickers =
+    typeof window !== 'undefined' &&
+    window.DocEditor &&
+    typeof window.DocEditor.createDatePickerCallbacks === 'function'
+      ? window.DocEditor.createDatePickerCallbacks()
+      : {};
+
+  // Do not put ui/fieldValueStyle in ...rest after this — that overwrote embedPdfInIframe.
+  return createEditor({
+    ...rest,
+    holder,
+    designMode,
+    data: data || emptyDocument(),
+    catalogs: resolveCatalogs(options),
+    pickers: {
+      ...datePickers,
+      ...(pickersOptions || {})
+    },
+    ui: {
+      designLayout: 'chrome',
+      chromeParent,
+      documentActionsContainer,
+      stickyChrome: false,
+      ...(uiOptions || {}),
+      // LWS blocks blob: iframe.src — canvas preview instead
+      embedPdfInIframe: false
+    },
+    fieldValueStyle: {
+      default: {
+        fontFamily: "'Salesforce Sans', Arial, sans-serif",
+        fontSize: '0.8125rem'
+      },
+      ...(fieldValueStyleOptions || {})
+    },
+    resolveListItems,
+    remoteListCollections,
+    remoteListLabelFields,
+    generatePdfBlob,
+    pdfAvailable,
+    onChange,
+    onShareDocument,
+    onPreviewStateChange
+  });
+}
+
+/**
+ * Resolve createDocEditor options with PDF helpers when a PDF provider is available.
+ * @param {object} options
+ */
+export async function resolveCreateDocEditorOptions(options = {}) {
+  const pdfOk = await checkPdfAvailable();
+  return {
+    ...options,
+    generatePdfBlob:
+      options.generatePdfBlob !== undefined
+        ? options.generatePdfBlob
+        : pdfOk
+          ? generatePdfBlobFromApex
+          : null,
+    pdfAvailable: options.pdfAvailable !== undefined ? options.pdfAvailable : pdfOk
+  };
+}
+
+/**
+ * Convert a Blob to base64 (no data: URL prefix) for Apex EncodingUtil.base64Decode.
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+export function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function shareMimeType(mimeType) {
+  return String(mimeType || 'application/octet-stream').split(';')[0].trim();
+}
+
+/**
+ * @param {{ blob: Blob, filename: string, mimeType?: string }} artifact
+ * @returns {File | null}
+ */
+export function artifactToFile(artifact) {
+  if (!artifact || !artifact.blob) return null;
+  try {
+    return new File([artifact.blob], artifact.filename || 'document', {
+      type: shareMimeType(artifact.mimeType)
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * True when the browser can open a system share sheet with this file (Email, Slack, …).
+ */
+export function canNativeShareArtifact(artifact) {
+  try {
+    if (!navigator.share || typeof navigator.canShare !== 'function') return false;
+    const file = artifactToFile(artifact);
+    if (!file) return false;
+    return !!navigator.canShare({ files: [file] });
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Open the OS share sheet when supported.
+ * @returns {Promise<'shared'|'cancelled'|'unavailable'>}
+ */
+export async function tryNativeShareArtifact(artifact) {
+  const file = artifactToFile(artifact);
+  if (!file || !navigator.share) return 'unavailable';
+  try {
+    if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+      return 'unavailable';
+    }
+    await navigator.share({
+      files: [file],
+      title: artifact.filename || 'Document'
+    });
+    return 'shared';
+  } catch (err) {
+    if (err && err.name === 'AbortError') return 'cancelled';
+    return 'unavailable';
+  }
+}
+
+export function parseJsonSafe(raw, fallback = null) {
+  if (!raw) {
+    return fallback;
+  }
+  if (typeof raw === 'object') {
+    return raw;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error('Invalid JSON: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
+/** Values-only payload stored on DocEngine_Document__c (kind: field). */
+export function isValuesOnlyPayload(data) {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+  if (data.kind === 'field') {
+    return true;
+  }
+  // Legacy/alternate shape: kind document without blocks
+  if (data.kind === 'document' && !Array.isArray(data.blocks)) {
+    return true;
+  }
+  return Boolean(data.sections || data.values) && !Array.isArray(data.blocks);
+}
+
+/** Full document export (legacy Document_JSON__c with blocks). */
+export function isFullDocumentPayload(data) {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+  if (data.kind === 'document' && Array.isArray(data.blocks)) {
+    return true;
+  }
+  return Array.isArray(data.blocks);
+}
+
+/**
+ * Resolve editor bootstrap for reopen:
+ * - legacy full Document_JSON → use as initial data
+ * - values-only → template structure + pending values to apply after mount
+ */
+export function resolveReopenEditorData(documentJson, templateJson) {
+  const docData = parseJsonSafe(documentJson, null);
+  const templateData = parseJsonSafe(templateJson, emptyDocument());
+
+  if (isFullDocumentPayload(docData)) {
+    return { initialData: docData, pendingValues: null, legacyFullDocument: true };
+  }
+  if (isValuesOnlyPayload(docData)) {
+    return { initialData: templateData || emptyDocument(), pendingValues: docData, legacyFullDocument: false };
+  }
+  return {
+    initialData: templateData || emptyDocument(),
+    pendingValues: null,
+    legacyFullDocument: false
+  };
+}

@@ -1,0 +1,117 @@
+/**
+ * Salesforce Lightning (SLDS / LWC) theme adapter for @docengine/editor.
+ *
+ * Load editor CSS from a Static Resource in LWC, then include this bridge file.
+ * Import after styles.css and bridge.css:
+ *
+ *   loadStyle(this, editorStylesResource);
+ *   loadStyle(this, editorBridgeResource);
+ *   loadStyle(this, editorSldsResource);
+ *
+ * Maps --me-* tokens to SLDS / LWC CSS custom properties. Fallbacks match
+ * Lightning Design System defaults when tokens are unavailable outside LWC.
+ */
+
+:root,
+.doc-editor-host,
+.doc-editor-root {
+  /* Brand */
+  --me-primary: var(--lwc-brandPrimary, var(--slds-c-button-brand-color-background, #0176d3));
+  --me-primary-hover: var(--slds-c-button-brand-color-background-hover, #014486);
+  --me-primary-contrast: var(--slds-c-button-brand-text-color, #fff);
+  --me-primary-muted: var(--lwc-brandPrimaryActive, #014486);
+
+  /* Surfaces */
+  --me-surface-0: var(--lwc-colorBackgroundAlt, var(--slds-g-color-neutral-base-100, #fff));
+  --me-surface-50: var(--lwc-colorBackground, var(--slds-g-color-neutral-base-95, #f3f3f3));
+  --me-surface-100: var(--lwc-colorBackgroundRowHover, #f3f3f3);
+  --me-surface-200: var(--lwc-colorBackgroundShade, #ecebea);
+  --me-surface-300: var(--lwc-colorBackgroundStencil, #ecebea);
+  --me-surface-muted: var(--lwc-colorBackgroundAlt, #fafafa);
+
+  /* Borders */
+  --me-border: var(--lwc-colorBorder, var(--slds-g-color-border-base-1, #c9c9c9));
+  --me-border-strong: var(--lwc-colorBorderInput, #747474);
+  --me-border-input: var(--lwc-colorBorderInput, #747474);
+  --me-border-subtle: var(--lwc-colorBorderSeparator, #e5e5e5);
+
+  /* Text */
+  --me-text: var(--lwc-colorTextDefault, #181818);
+  --me-text-body: var(--lwc-colorTextDefault, #181818);
+  --me-text-muted: var(--lwc-colorTextLabel, #444);
+  --me-text-subtle: var(--lwc-colorTextWeak, #706e6b);
+  --me-text-placeholder: var(--lwc-colorTextInputDisabled, #747474);
+
+  /* Accent panels */
+  --me-accent-surface: var(--lwc-colorBackgroundHighlight, #f3f2f2);
+  --me-accent-border: var(--lwc-colorBorder, #c9c9c9);
+  --me-accent-hover: var(--lwc-colorBackgroundRowHover, #f3f3f3);
+  --me-accent-hover-border: var(--lwc-brandPrimary, #0176d3);
+  --me-accent-panel: var(--lwc-colorBackgroundShade, #ecebea);
+
+  /* Focus / selection */
+  --me-focus-color: var(--lwc-brandPrimary, #0176d3);
+  --me-focus-ring: 0 0 0 2px var(--lwc-colorBackgroundRowSelected, rgba(1, 118, 211, 0.25));
+  --me-selection-outline: var(--lwc-brandPrimary, #0176d3);
+  --me-selection-bg: var(--lwc-colorBackgroundRowSelected, rgba(1, 118, 211, 0.08));
+  --me-drop-indicator: var(--lwc-brandPrimary, #0176d3);
+
+  /* Semantic */
+  --me-danger: var(--lwc-colorTextError, #ba0517);
+  --me-danger-strong: var(--lwc-colorTextError, #ba0517);
+  --me-danger-bg: var(--lwc-colorBackgroundToastError, #fef1ee);
+  --me-danger-surface: var(--lwc-colorBackgroundToastError, #fef1ee);
+  --me-danger-border: var(--lwc-colorBorderError, #ea001e);
+  --me-warning: var(--lwc-colorBackgroundWarning, #ffb75d);
+  --me-warning-bg: var(--lwc-colorBackgroundToastWarning, #fff8e6);
+  --me-warning-outline: #fe9339;
+
+  /* Typography — use the standard Salesforce font (no bundled Inter). */
+  --me-font-family: var(--lwc-fontFamily, var(--slds-g-font-family, 'Salesforce Sans', Arial, sans-serif));
+  --me-document-font-family: var(--lwc-fontFamily, var(--slds-g-font-family, 'Salesforce Sans', Arial, sans-serif));
+  --me-font-size: 0.8125rem;
+  --me-font-size-sm: 0.75rem;
+  --me-font-size-xs: 0.6875rem;
+
+  /* Layout */
+  --me-radius-sm: var(--lwc-borderRadiusMedium, 0.25rem);
+  --me-radius-md: var(--lwc-borderRadiusMedium, 0.25rem);
+  /* Salesforce modals commonly sit above standard page chrome */
+  --me-overlay-z-index: 9001;
+  --me-shadow-modal: var(--lwc-shadowDropDown, 0 2px 3px rgba(0, 0, 0, 0.16));
+  --me-shadow-sticky: var(--lwc-shadowHeader, 0 2px 4px rgba(0, 0, 0, 0.07));
+}
+
+/* SLDS-aligned button sizing inside editor UI */
+.btn {
+  height: 2rem;
+  padding: 0 0.75rem;
+  line-height: 1.875rem;
+}
+
+.btn-sm {
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  font-size: var(--me-font-size-sm);
+}
+
+.btn-primary {
+  background: var(--me-primary);
+  border-color: var(--me-primary);
+  color: var(--me-primary-contrast);
+}
+
+.btn-primary:hover {
+  background: var(--me-primary-hover);
+  border-color: var(--me-primary-hover);
+}
+
+.modal__input,
+.modal__search,
+.modal__textarea,
+.modal__number,
+.rich-text-toolbar__input,
+.rich-text-toolbar__select,
+.document-section__name-input {
+  min-height: 2rem;
+}

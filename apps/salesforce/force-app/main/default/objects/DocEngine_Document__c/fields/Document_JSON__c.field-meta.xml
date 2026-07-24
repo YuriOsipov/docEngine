@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Document_JSON__c</fullName>
+    <description>Values-only exportFields() JSON (kind: field). Structure/mapping come from Template_Version__c. Legacy full document JSON is still accepted on reopen.</description>
+    <label>Document JSON</label>
+    <length>131072</length>
+    <type>LongTextArea</type>
+    <visibleLines>8</visibleLines>
+</CustomField>

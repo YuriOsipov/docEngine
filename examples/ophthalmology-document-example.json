@@ -1,0 +1,88 @@
+{
+  "time": 1782202748519,
+  "blocks": [
+    {
+      "type": "documentSection",
+      "data": {
+        "segments": [
+          { "type": "text", "content": "Complaints: " },
+          { "type": "field", "id": "complaints", "placeholder": "Complaints" },
+          { "type": "text", "content": ".\nLife history: " },
+          { "type": "field", "id": "lifeAnamnesis", "placeholder": "Life history" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "complaints": [
+            "Vision disturbance decreased acuity",
+            "Tearing",
+            "Redness"
+          ],
+          "lifeAnamnesis": [
+            "Chronic conditions diabetes mellitus",
+            "Allergy seasonal",
+            "Unremarkable"
+          ]
+        }
+      }
+    },
+    {
+      "type": "visionTable",
+      "data": {
+        "cells": {
+          "od_vis": "1.0",
+          "od_sph": "-1.0",
+          "od_cyl": "-0.50",
+          "od_ax": "90",
+          "od_vis2": "1.0",
+          "od_bo": "—",
+          "os_vis": "0.9",
+          "os_sph": "-0.5",
+          "os_cyl": "0",
+          "os_ax": "0",
+          "os_vis2": "0.9",
+          "os_bo": "—"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "segments": [
+          { "type": "text", "content": "Correction method: " },
+          { "type": "field", "id": "correctionOd", "placeholder": "OD" },
+          { "type": "text", "content": ", " },
+          { "type": "field", "id": "correctionOs", "placeholder": "OS" },
+          { "type": "text", "content": ".\nConjunctiva: " },
+          { "type": "field", "id": "conjunctivaOd", "placeholder": "OD" },
+          { "type": "text", "content": ", " },
+          { "type": "field", "id": "conjunctivaOs", "placeholder": "OS" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "correctionOd": "normal",
+          "correctionOs": "normal",
+          "conjunctivaOd": "normal",
+          "conjunctivaOs": "pathology"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "segments": [
+          { "type": "text", "content": "Diagnosis: " },
+          { "type": "field", "id": "icd10", "placeholder": "ICD-10 list" },
+          { "type": "text", "content": ".\nClinical diagnosis: " },
+          { "type": "field", "id": "clinicalDiagnosis", "placeholder": "Clinical diagnosis" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "icd10": [
+            "H52.1 — Myopia"
+          ],
+          "clinicalDiagnosis": "Mild myopia"
+        }
+      }
+    }
+  ]
+}

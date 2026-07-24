@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Template__c</fullName>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <description>Source template that produced this document.</description>
+    <label>Template</label>
+    <referenceTo>DocEngine_Template__c</referenceTo>
+    <relationshipLabel>DocEngine Documents</relationshipLabel>
+    <relationshipName>Documents</relationshipName>
+    <required>true</required>
+    <type>Lookup</type>
+</CustomField>

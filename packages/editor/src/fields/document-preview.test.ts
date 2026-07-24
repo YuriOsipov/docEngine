@@ -1,0 +1,815 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { before, describe, it } from 'node:test';
+import { parseHTML } from 'linkedom';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const mammologyTemplate = JSON.parse(
+  readFileSync(join(__dirname, '../../../../examples/mammology-document-template.json'), 'utf8'),
+);
+
+let filterSegmentsForPreview: any;
+let renderDocumentPreview: any;
+
+const mammologySegments = mammologyTemplate.blocks[0].data.segments;
+const fieldSchemas = mammologyTemplate.fieldSchemas;
+
+const filledFieldValues = {
+  statusLocalis: ['Права грудна залоза дольчата', 'Ліва грудна залоза бугристі структури різної величини'],
+  focalPalpation: ['Утворення до 1 см'],
+  nippleDischarge: "кров'янисті",
+  regionalLymphNodes: 'щільні',
+  skinChanges: ['втягнення шкіри'],
+  diagnosis: ['Складна кіста правої грудної залози', 'Проста кіста лівої грудної залози'],
+  recommended: ['Консультація онколога', 'МРТ грудних залоз'],
+};
+
+const emptyFieldValues = mammologyTemplate.blocks[0].data.fieldValues;
+
+before(async () => {
+  const { window } = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  globalThis.document = window.document;
+  globalThis.Node = window.Node;
+  globalThis.DocumentFragment = window.DocumentFragment;
+  globalThis.DOMParser = class {
+    parseFromString(markup: any, mimeType: any) {
+      if (mimeType !== 'text/html') {
+        return parseHTML('<!DOCTYPE html><html><body></body></html>').document;
+      }
+      const html = String(markup ?? '');
+      const wrapped = /<html[\s>]/i.test(html)
+        ? html
+        : `<!DOCTYPE html><html><body>${html}</body></html>`;
+      return parseHTML(wrapped).document;
+    }
+  };
+
+  const preview = await import('./document-preview.js');
+  filterSegmentsForPreview = preview.filterSegmentsForPreview;
+  renderDocumentPreview = preview.renderDocumentPreview;
+});
+
+describe('filterSegmentsForPreview', () => {
+  it('preserves row separator newlines in text segments when fields are filled', () => {
+    const filtered = filterSegmentsForPreview(
+      mammologySegments,
+      filledFieldValues,
+      fieldSchemas,
+    );
+
+    const rowSeparators = filtered.filter(
+      (seg: any) => seg.type === 'text' && !seg.html && String(seg.content ?? '').includes('.\n'),
+    );
+    assert.ok(rowSeparators.length >= 5, 'row separators with .\\n should remain');
+    assert.ok(
+      filtered.some(
+        (seg: any) =>
+          seg.type === 'text' &&
+          seg.content === '.\nВогнещевої патології пальпаторно: ',
+      ),
+    );
+  });
+
+  it('does not drop standalone newline segments between field and row label', () => {
+    const segments = [
+      { type: 'field', id: 'statusLocalis' },
+      { type: 'text', content: '\n' },
+      { type: 'text', content: '.\nВогнещевої патології пальпаторно: ' },
+      { type: 'field', id: 'focalPalpation' },
+    ];
+
+    const filtered = filterSegmentsForPreview(segments, filledFieldValues, fieldSchemas);
+    assert.ok(
+      filtered.some((seg: any) => seg.type === 'text' && seg.content === '\n'),
+      'standalone newline segment should be preserved',
+    );
+  });
+
+  it('preserves html row separators with embedded newlines', () => {
+    const segments = [
+      { type: 'text', html: '<b>ST.LOCALIS: </b>' },
+      { type: 'field', id: 'statusLocalis' },
+      { type: 'text', html: '<b>.\nВогнещевої патології пальпаторно: </b>' },
+      { type: 'field', id: 'focalPalpation' },
+    ];
+
+    const filtered = filterSegmentsForPreview(segments, filledFieldValues, fieldSchemas);
+    assert.ok(
+      filtered.some(
+        (seg: any) => seg.type === 'text' && seg.html?.includes('.\nВогнещевої'),
+      ),
+    );
+  });
+
+  it('removes all mammology rows when every field is empty', () => {
+    const filtered = filterSegmentsForPreview(
+      mammologySegments,
+      emptyFieldValues,
+      fieldSchemas,
+    );
+
+    assert.deepEqual(filtered, []);
+  });
+
+  it('removes html labels when the following field is empty', () => {
+    const segments = [
+      { type: 'text', html: '<b>ST.LOCALIS: </b>' },
+      { type: 'field', id: 'statusLocalis' },
+      {
+        type: 'text',
+        html: '.\nРегіонарні <mark>лімфатичні вузли</mark>: ',
+      },
+      { type: 'field', id: 'regionalLymphNodes', placeholder: 'Регіонарні límphatичні vузли' },
+    ];
+
+    const filtered = filterSegmentsForPreview(segments, emptyFieldValues, fieldSchemas);
+    assert.deepEqual(filtered, []);
+  });
+
+  it('treats placeholder-like and separator field values as empty', () => {
+    const segments = [
+      { type: 'text', content: '.\nРегіонарні límphatичні vузли: ' },
+      { type: 'field', id: 'regionalLymphNodes', placeholder: 'Регіонарні límphatичні vузли' },
+    ];
+
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { regionalLymphNodes: '.' }, fieldSchemas),
+      [],
+    );
+    assert.deepEqual(
+      filterSegmentsForPreview(
+        segments,
+        { regionalLymphNodes: 'Регіонарні límphatичні vузли' },
+        fieldSchemas,
+      ),
+      [],
+    );
+  });
+
+  it('removes standalone field headings without a trailing colon', () => {
+    const segments = [
+      { type: 'text', content: '.\nNotes\n' },
+      { type: 'field', id: 'notes', placeholder: 'Notes' },
+    ];
+
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { notes: '' }, fieldSchemas),
+      [],
+    );
+  });
+
+  it('removes html field headings without a trailing colon', () => {
+    const segments = [
+      {
+        type: 'text',
+        html: '<b><div style="text-align: center"><h1>Рекомендовано</h1></div></b> ',
+      },
+      { type: 'field', id: 'recommended', placeholder: 'Рекомендовано' },
+    ];
+
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { recommended: [] }, fieldSchemas),
+      [],
+    );
+  });
+
+  it('removes orphaned OD/OS commas when both eye fields are empty', () => {
+    const schemas = {
+      orbitOd: { type: 'choice', label: 'OD', name: 'orbitOd' },
+      orbitOs: { type: 'choice', label: 'OS', name: 'orbitOs' },
+      eyelidsOd: { type: 'choice', label: 'OD', name: 'eyelidsOd' },
+      eyelidsOs: { type: 'choice', label: 'OS', name: 'eyelidsOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.\nEyelids: ' },
+      { type: 'field', id: 'eyelidsOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'eyelidsOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, {}, schemas),
+      [],
+    );
+  });
+
+  it('keeps the comma between filled OD and OS values', () => {
+    const schemas = {
+      orbitOd: { type: 'choice', label: 'OD', name: 'orbitOd' },
+      orbitOs: { type: 'choice', label: 'OS', name: 'orbitOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    const filtered = filterSegmentsForPreview(
+      segments,
+      { orbitOd: 'normal', orbitOs: 'normal' },
+      schemas,
+    );
+
+    assert.deepEqual(filtered, [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.' },
+    ]);
+  });
+
+  it('keeps the peer comma when only one eye field has a value', () => {
+    const schemas = {
+      orbitOd: { type: 'choice', label: 'OD', name: 'orbitOd' },
+      orbitOs: { type: 'choice', label: 'OS', name: 'orbitOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    // Filled OD + empty OS → `Orbit: normal, .`
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { orbitOd: 'normal' }, schemas),
+      [
+        { type: 'text', content: 'Orbit: ' },
+        { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+        { type: 'text', content: ', ' },
+        { type: 'text', content: '.' },
+      ],
+    );
+
+    // Empty OD + filled OS → `Orbit: , normal.`
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { orbitOs: 'normal' }, schemas),
+      [
+        { type: 'text', content: 'Orbit: ' },
+        { type: 'text', content: ', ' },
+        { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+        { type: 'text', content: '.' },
+      ],
+    );
+  });
+
+  it('keeps each eye-row label and comma when only OS is filled on later rows', () => {
+    const schemas = {
+      orbitOd: { type: 'choice', label: 'OD', name: 'orbitOd' },
+      orbitOs: { type: 'choice', label: 'OS', name: 'orbitOs' },
+      eyelidsOd: { type: 'choice', label: 'OD', name: 'eyelidsOd' },
+      eyelidsOs: { type: 'choice', label: 'OS', name: 'eyelidsOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.\nEyelids: ' },
+      { type: 'field', id: 'eyelidsOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'eyelidsOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    const filtered = filterSegmentsForPreview(
+      segments,
+      { orbitOs: 'clear', eyelidsOs: 'absent' },
+      schemas,
+    );
+
+    assert.deepEqual(filtered, [
+      { type: 'text', content: 'Orbit: ' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+      { type: 'text', content: '.\nEyelids: ' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'eyelidsOs', placeholder: 'OS' },
+      { type: 'text', content: '.' },
+    ]);
+  });
+
+  it('strips a leading row-ending period when earlier empty rows are removed', () => {
+    const schemas = {
+      eyelidsOd: { type: 'choice', label: 'OD', name: 'eyelidsOd' },
+      eyelidsOs: { type: 'choice', label: 'OS', name: 'eyelidsOs' },
+      anteriorOd: { type: 'choice', label: 'OD', name: 'anteriorOd' },
+      anteriorOs: { type: 'choice', label: 'OS', name: 'anteriorOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Eyelids: ' },
+      { type: 'field', id: 'eyelidsOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'eyelidsOs', placeholder: 'OS' },
+      { type: 'text', content: '.\nAnterior chamber: ' },
+      { type: 'field', id: 'anteriorOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'anteriorOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    const filtered = filterSegmentsForPreview(
+      segments,
+      { anteriorOd: 'wide' },
+      schemas,
+    );
+
+    assert.deepEqual(filtered, [
+      { type: 'text', content: 'Anterior chamber: ' },
+      { type: 'field', id: 'anteriorOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'text', content: '.' },
+    ]);
+    assert.ok(
+      !filtered.some((seg: any) => String(seg.content ?? '').startsWith('.\n')),
+      'orphaned leading period-from-previous-row glue should be removed from labels',
+    );
+  });
+
+  it('keeps the sentence-ending period when the next empty row is removed', () => {
+    const schemas = {
+      patencyOd: { type: 'choice', label: 'OD', name: 'patencyOd' },
+      patencyOs: { type: 'choice', label: 'OS', name: 'patencyOs' },
+      scleraOd: { type: 'choice', label: 'OD', name: 'scleraOd' },
+      scleraOs: { type: 'choice', label: 'OS', name: 'scleraOs' },
+    };
+    const segments = [
+      { type: 'text', content: 'Patency: ' },
+      { type: 'field', id: 'patencyOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'patencyOs', placeholder: 'OS' },
+      { type: 'text', content: '.\nSclera: ' },
+      { type: 'field', id: 'scleraOd', placeholder: 'OD' },
+      { type: 'text', content: ', ' },
+      { type: 'field', id: 'scleraOs', placeholder: 'OS' },
+      { type: 'text', content: '.\n' },
+    ];
+
+    // Empty OD + OS "clear", following row empty → `Patency: , clear.` (not trailing comma)
+    assert.deepEqual(
+      filterSegmentsForPreview(segments, { patencyOs: 'clear' }, schemas),
+      [
+        { type: 'text', content: 'Patency: ' },
+        { type: 'text', content: ', ' },
+        { type: 'field', id: 'patencyOs', placeholder: 'OS' },
+        { type: 'text', content: '.' },
+      ],
+    );
+  });
+});
+
+describe('renderDocumentPreview', () => {
+  it('renders mammology rows without collapsing line breaks', () => {
+    const doc = {
+      fieldSchemas,
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Огляд',
+            segments: mammologySegments,
+            fieldValues: filledFieldValues,
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    const html = root.innerHTML;
+
+    assert.doesNotMatch(html, /дольчата\.Вогнещевої/);
+    assert.doesNotMatch(html, /1 см\.Виділення/);
+    assert.match(html, /дольчата[\s\S]*<br>[\s\S]*Вогнещевої патології пальпаторно:/);
+  });
+
+  it('renders html bold row separators with line breaks', () => {
+    const doc = {
+      fieldSchemas,
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Огляд',
+            segments: [
+              { type: 'text', html: '<b>ST.LOCALIS: </b>' },
+              { type: 'field', id: 'statusLocalis' },
+              { type: 'text', html: '<b>.\nВогнещевої патології пальпаторно: </b>' },
+              { type: 'field', id: 'focalPalpation' },
+            ],
+            fieldValues: filledFieldValues,
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    const html = root.innerHTML;
+
+    assert.doesNotMatch(html, /дольчата\.Вогнещевої/);
+    assert.match(html, /<b>[\s\S]*Вогнещевої патології пальпаторно:/);
+    assert.match(html, /<br>/);
+  });
+
+  it('hides empty mammology rows in preview output when hideEmptyValues is true', () => {
+    const doc = {
+      fieldSchemas,
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Огляд',
+            segments: mammologySegments,
+            fieldValues: emptyFieldValues,
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: true });
+    const html = root.innerHTML;
+
+    assert.doesNotMatch(html, new RegExp(fieldSchemas.regionalLymphNodes.label));
+    assert.doesNotMatch(html, /ST\.LOCALIS/);
+    assert.match(html, /preview-document__empty|document-section__header/);
+  });
+
+  it('shows section structure in preview by default when fields are empty', () => {
+    const doc = {
+      fieldSchemas,
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Огляд',
+            segments: [{ type: 'field', id: 'diagnosis' }],
+            fieldValues: { diagnosis: '' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    assert.doesNotMatch(root.innerHTML, /preview-document__empty/);
+    assert.match(root.innerHTML, /document-section__header/);
+  });
+
+  it('shows placeholder for empty required fields in preview', () => {
+    const doc = {
+      fieldSchemas: {
+        notes: { type: 'text', label: 'Notes', name: 'notes', required: true },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Section',
+            segments: [
+              { type: 'text', content: 'Notes: ' },
+              { type: 'field', id: 'notes', placeholder: 'Notes' },
+            ],
+            fieldValues: { notes: '' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    const token = root.querySelector('.field-token--preview.field-token--required-missing');
+    assert.ok(token, 'required-missing token should render');
+    assert.match(token.textContent ?? '', /Notes/);
+  });
+
+  it('keeps empty required fields visible with placeholder when hideEmptyValues is true', () => {
+    const schemas = {
+      notes: { type: 'text', label: 'Notes', name: 'notes', required: true },
+      other: { type: 'text', label: 'Other', name: 'other', required: false },
+    };
+    const segments = [
+      { type: 'text', content: 'Notes: ' },
+      { type: 'field', id: 'notes', placeholder: 'Notes' },
+      { type: 'text', content: '.\nOther: ' },
+      { type: 'field', id: 'other', placeholder: 'Other' },
+    ];
+
+    const filtered = filterSegmentsForPreview(segments, {}, schemas);
+    assert.ok(filtered.some((seg: any) => seg.type === 'field' && seg.id === 'notes'));
+    assert.ok(!filtered.some((seg: any) => seg.type === 'field' && seg.id === 'other'));
+
+    const root = renderDocumentPreview(
+      {
+        fieldSchemas: schemas,
+        blocks: [
+          {
+            type: 'documentSection',
+            data: { label: 'Section', segments, fieldValues: {} },
+          },
+        ],
+      },
+      { hideEmptyValues: true },
+    );
+    const token = root.querySelector('.field-token--preview.field-token--required-missing');
+    assert.ok(token, 'required empty field should remain visible');
+    assert.match(token.textContent ?? '', /Notes/);
+    assert.equal(root.querySelector('[data-field-id="other"]'), null);
+  });
+
+  it('keeps empty optional field tokens blank in preview when hideEmptyValues is false', () => {
+    const doc = {
+      fieldSchemas: {
+        notes: { type: 'text', label: 'Notes', name: 'notes' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Section',
+            segments: [
+              { type: 'text', content: 'Notes: ' },
+              { type: 'field', id: 'notes' },
+            ],
+            fieldValues: { notes: '' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    assert.ok(!root.classList.contains('preview-document--hide-empty'));
+    const token = root.querySelector('.field-token--preview.field-token--empty');
+    assert.ok(token, 'empty field token should render');
+    assert.equal((token.textContent ?? '').trim(), '');
+  });
+
+  it('hides empty field tokens in preview when hideEmptyValues is true', () => {
+    const doc = {
+      fieldSchemas: {
+        notes: { type: 'text', label: 'Notes', name: 'notes' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Section',
+            segments: [{ type: 'field', id: 'notes' }],
+            fieldValues: { notes: '' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: true });
+    assert.ok(root.classList.contains('preview-document--hide-empty'));
+    assert.equal(root.querySelector('.field-token--preview'), null);
+  });
+
+  it('shows populated template child field in preview when hideEmptyValues is true', () => {
+    const doc = {
+      fieldSchemas: {
+        addressField: {
+          type: 'child',
+          label: 'address',
+          name: 'address',
+          fieldSchemas: {},
+          template: {
+            fieldSchemas: {
+              city: { type: 'text', name: 'City', label: 'City' },
+              address: { type: 'text', name: 'Address', label: 'Address' },
+            },
+            blocks: [
+              {
+                type: 'documentSection',
+                data: {
+                  label: '',
+                  segments: [
+                    { type: 'field', id: 'city' },
+                    { type: 'field', id: 'address' },
+                  ],
+                  fieldValues: {},
+                },
+              },
+            ],
+          },
+        },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'header',
+            segments: [{ type: 'field', id: 'addressField' }],
+            fieldValues: {
+              addressField: { city: 'milan', address: 'via per arogno 4' },
+            },
+          },
+        },
+      ],
+    };
+
+    const filtered = filterSegmentsForPreview(
+      doc.blocks[0].data.segments,
+      { addressField: { city: 'milan', address: 'via per arogno 4' } },
+      doc.fieldSchemas,
+    );
+    assert.equal(filtered.length, 1);
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: true });
+    assert.ok(root.classList.contains('preview-document--hide-empty'));
+    assert.match(root.textContent ?? '', /milan/);
+    assert.match(root.textContent ?? '', /via per arogno 4/);
+  });
+
+  it('renders empty child field template with blank nested empties when hideEmptyValues is false', () => {
+    const doc = {
+      fieldSchemas: {
+        childField: {
+          type: 'child',
+          label: 'Child',
+          name: 'child',
+          fieldSchemas: {
+            age: { type: 'integer', label: 'age', name: 'age' },
+          },
+        },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'header',
+            segments: [{ type: 'field', id: 'childField' }],
+            fieldValues: { childField: {} },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    const repeater = root.querySelector('.field-token--repeater.field-token--preview');
+    assert.ok(repeater, 'child field token should render');
+    const nestedEmpty = repeater.querySelector('.field-token--preview.field-token--empty');
+    assert.ok(nestedEmpty, 'empty nested field token should render');
+    assert.equal((nestedEmpty.textContent ?? '').trim(), '');
+  });
+
+  it('renders child field values inside table cells in HTML preview', () => {
+    const childId = 'main_table_row1_column_2';
+    const doc = {
+      fieldSchemas: {
+        main_table: {
+          type: 'table',
+          label: 'main',
+          columns: [
+            { key: 'column_1', label: 'Column 1' },
+            { key: 'column_2', label: 'Column 2' },
+          ],
+          rows: [{ key: 'row1', label: '' }],
+        },
+        main_table_row1_column_1: { type: 'text', label: 'Column 1' },
+        [childId]: {
+          type: 'child',
+          label: 'Column 2',
+          name: 'Column 2',
+          fieldSchemas: {
+            id: { type: 'text', label: 'id', name: 'id' },
+            name: { type: 'text', label: 'name', name: 'name' },
+          },
+        },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'main',
+            segments: [
+              {
+                type: 'table',
+                id: 'main_table',
+                rows: [{ key: 'row1', label: '' }],
+              },
+            ],
+            fieldValues: {
+              main_table_row1_column_1: '2',
+              [childId]: { id: '10', name: 'nameW' },
+            },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    assert.match(root.textContent ?? '', /nameW/, 'child nested name should appear in preview');
+    assert.match(root.textContent ?? '', /10/, 'child nested id should appear in preview');
+    const childToken = root.querySelector('.field-token--repeater');
+    assert.ok(childToken, 'child cell token should render inside the preview table');
+  });
+
+  it('applies field highlight CSS vars on preview root', () => {
+    const doc = {
+      pageSetup: { fieldHighlight: { color: '#7c3aed' } },
+      fieldSchemas,
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Огляд',
+            segments: [{ type: 'field', id: 'diagnosis' }],
+            fieldValues: { diagnosis: ['Test diagnosis'] },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    assert.equal(root.style.getPropertyValue('--me-field-fill-color'), '#7C3AED');
+    const token = root.querySelector('.field-token--preview');
+    assert.ok(token, 'preview field token should render');
+  });
+
+  it('omits sections hidden by visibility rules', () => {
+    const doc = {
+      fieldSchemas: {
+        status: { type: 'text', name: 'Status' },
+        hiddenNote: { type: 'text', name: 'Hidden note' },
+        visibleNote: { type: 'text', name: 'Visible note' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Driver',
+            segments: [{ type: 'field', id: 'status' }],
+            fieldValues: { status: 'hide-details' },
+          },
+        },
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Hidden details',
+            visibility: {
+              fieldId: 'status',
+              mode: 'hide',
+              operator: 'equals',
+              value: 'hide-details',
+            },
+            segments: [{ type: 'field', id: 'hiddenNote' }],
+            fieldValues: { hiddenNote: 'Should not render' },
+          },
+        },
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Visible details',
+            visibility: {
+              fieldId: 'status',
+              mode: 'show',
+              operator: 'equals',
+              value: 'hide-details',
+            },
+            segments: [{ type: 'field', id: 'visibleNote' }],
+            fieldValues: { visibleNote: 'Should render' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    assert.doesNotMatch(root.textContent ?? '', /Hidden details/);
+    assert.doesNotMatch(root.textContent ?? '', /Should not render/);
+    assert.match(root.textContent ?? '', /Visible details/);
+    assert.match(root.textContent ?? '', /Should render/);
+  });
+
+  it('omits the section title when hideTitleInPreview is true', () => {
+    const doc = {
+      fieldSchemas: {
+        complaints: { type: 'text', name: 'Complaints' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Anamnesis',
+            hideTitleInPreview: true,
+            segments: [{ type: 'field', id: 'complaints' }],
+            fieldValues: { complaints: 'Headache' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    assert.equal(root.querySelector('.document-section__label-text'), null);
+    assert.doesNotMatch(root.textContent ?? '', /Anamnesis/);
+    assert.match(root.textContent ?? '', /Headache/);
+  });
+});

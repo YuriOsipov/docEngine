@@ -1,0 +1,20 @@
+{
+  "name": "ophthalmology-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@docengine/editor": "file:../../packages/editor",
+    "@docengine/field-date": "file:../../packages/field-date",
+    "@editorjs/editorjs": "^2.30.8"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

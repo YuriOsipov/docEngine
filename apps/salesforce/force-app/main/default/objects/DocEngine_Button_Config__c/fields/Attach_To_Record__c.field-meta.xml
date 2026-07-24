@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Attach_To_Record__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>
+      When true, Finish saves the DocEngine instance and also attaches a PDF/HTML file
+      to the current record (Files and Notes &amp; Attachments). Format follows Export Mode
+      (pdf or html; defaults to html when Export Mode is none).
+    </description>
+    <label>Attach to Record Files</label>
+    <type>Checkbox</type>
+</CustomField>

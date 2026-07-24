@@ -1,0 +1,49 @@
+<template>
+  <lightning-quick-action-panel header={cardTitle}>
+    <div class="launcher">
+      <template if:true={errorMessage}>
+        <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+          <span>{errorMessage}</span>
+        </div>
+      </template>
+
+      <template if:true={showWaiting}>
+        <div class="waiting-row">
+          <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+          <p class="slds-text-body_small slds-text-color_weak">Loading…</p>
+        </div>
+      </template>
+
+      <template if:true={showPicker}>
+        <div class="picker-row">
+          <lightning-combobox
+            label="Template"
+            value={selectedTemplateId}
+            options={templateOptions}
+            placeholder={templatePlaceholder}
+            onchange={handleTemplateChange}
+            disabled={templatesLoading}
+          ></lightning-combobox>
+        </div>
+      </template>
+
+      <template if:true={showSpinner}>
+        <div class="waiting-row">
+          <lightning-spinner alternative-text="Working" size="small"></lightning-spinner>
+          <p class="slds-text-body_small slds-text-color_weak">Opening…</p>
+        </div>
+      </template>
+    </div>
+
+    <div slot="footer" if:true={showPicker}>
+      <lightning-button label="Cancel" onclick={handleCancel} disabled={busy}></lightning-button>
+      <lightning-button
+        class="slds-m-left_x-small"
+        label={continueLabel}
+        variant="brand"
+        onclick={handleContinue}
+        disabled={continueDisabled}
+      ></lightning-button>
+    </div>
+  </lightning-quick-action-panel>
+</template>

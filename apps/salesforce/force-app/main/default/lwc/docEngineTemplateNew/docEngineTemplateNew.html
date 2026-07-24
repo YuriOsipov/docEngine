@@ -1,0 +1,42 @@
+<template>
+  <lightning-card title="Create New Template" icon-name="standard:draft">
+    <div class="slds-p-around_medium">
+      <lightning-input
+        label="Template Name"
+        value={templateName}
+        onchange={handleNameChange}
+        required
+        class="slds-m-bottom_small"
+      ></lightning-input>
+
+      <lightning-textarea
+        label="Template Description"
+        value={description}
+        onchange={handleDescriptionChange}
+        class="slds-m-bottom_small"
+      ></lightning-textarea>
+
+      <lightning-combobox
+        label="Data Source"
+        placeholder="Search Salesforce objects…"
+        value={sourceObject}
+        options={objectOptions}
+        onchange={handleSourceChange}
+        required
+        class="slds-m-bottom_medium"
+      ></lightning-combobox>
+
+      <div class="slds-grid slds-grid_align-end">
+        <lightning-button-group>
+          <lightning-button label="Cancel" onclick={handleCancel} disabled={saving}></lightning-button>
+          <lightning-button
+            label="Create"
+            variant="brand"
+            onclick={handleCreate}
+            disabled={createDisabled}
+          ></lightning-button>
+        </lightning-button-group>
+      </div>
+    </div>
+  </lightning-card>
+</template>

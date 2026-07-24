@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./lib",
+    "noEmit": false,
+    "composite": true,
+    "tsBuildInfoFile": "./lib/.tsbuildinfo",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@docengine/editor": ["./src/index.ts"],
+      "@docengine/editor/node": ["./src/node.ts"],
+      "@editorjs/editorjs": ["./src/editorjs-shim.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "exclude": ["lib", "dist", "node_modules"]
+}

@@ -1,0 +1,61 @@
+:host {
+  display: block;
+}
+
+.doc-editor-root {
+  --me-primary: var(--lwc-brandPrimary, #0176d3);
+  --me-primary-hover: var(--lwc-brandPrimaryActive, #014486);
+  --me-primary-contrast: #fff;
+  --me-primary-muted: var(--lwc-brandPrimaryActive, #014486);
+
+  --me-surface-0: var(--lwc-colorBackgroundAlt, #fff);
+  --me-surface-50: var(--lwc-colorBackground, #f3f3f3);
+  --me-surface-100: var(--lwc-colorBackgroundRowHover, #f3f3f3);
+  --me-surface-200: var(--lwc-colorBackgroundShade, #ecebea);
+  --me-surface-300: var(--lwc-colorBackgroundStencil, #ecebea);
+  --me-surface-muted: var(--lwc-colorBackgroundAlt, #fafafa);
+
+  --me-border: var(--lwc-colorBorder, #c9c9c9);
+  --me-border-strong: var(--lwc-colorBorderInput, #747474);
+  --me-border-input: var(--lwc-colorBorderInput, #747474);
+  --me-border-subtle: var(--lwc-colorBorderSeparator, #e5e5e5);
+
+  --me-text: var(--lwc-colorTextDefault, #181818);
+  --me-text-body: var(--lwc-colorTextDefault, #181818);
+  --me-text-muted: var(--lwc-colorTextLabel, #444);
+  --me-text-subtle: var(--lwc-colorTextWeak, #706e6b);
+  --me-text-placeholder: var(--lwc-colorTextInputDisabled, #747474);
+
+  --me-focus-color: var(--lwc-brandPrimary, #0176d3);
+  --me-selection-outline: var(--lwc-brandPrimary, #0176d3);
+  --me-drop-indicator: var(--lwc-brandPrimary, #0176d3);
+
+  --me-font-family: var(--lwc-fontFamily, 'Salesforce Sans', Arial, sans-serif);
+  --me-radius-sm: var(--lwc-borderRadiusMedium, 0.25rem);
+  --me-radius-md: var(--lwc-borderRadiusMedium, 0.25rem);
+}
+
+.sticky-chrome {
+  --me-surface-300: var(--lwc-colorBackgroundShade, #ecebea);
+}
+
+.doc-actions {
+  min-height: 2rem;
+}
+
+.editor-root {
+  min-height: 320px;
+}
+
+.toolbar-row {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.picker-row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}

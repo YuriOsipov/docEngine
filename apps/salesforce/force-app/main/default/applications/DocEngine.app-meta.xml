@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionOverrides>
+        <actionName>View</actionName>
+        <comment>App default: DocEngine Template Record Page with template builder</comment>
+        <content>DocEngine_Template_Record_Page</content>
+        <formFactor>Large</formFactor>
+        <pageOrSobjectType>DocEngine_Template__c</pageOrSobjectType>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
+        <type>Flexipage</type>
+    </actionOverrides>
+    <actionOverrides>
+        <actionName>View</actionName>
+        <comment>App default (phone): DocEngine Template Record Page with template builder</comment>
+        <content>DocEngine_Template_Record_Page</content>
+        <formFactor>Small</formFactor>
+        <pageOrSobjectType>DocEngine_Template__c</pageOrSobjectType>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
+        <type>Flexipage</type>
+    </actionOverrides>
+    <brand>
+        <headerColor>#0176D3</headerColor>
+        <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
+    </brand>
+    <description>Design document templates and fill them from Salesforce records.</description>
+    <formFactors>Large</formFactors>
+    <formFactors>Small</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <label>DocEngine</label>
+    <navType>Standard</navType>
+    <profileActionOverrides>
+        <actionName>View</actionName>
+        <content>DocEngine_Template_Record_Page</content>
+        <formFactor>Large</formFactor>
+        <pageOrSobjectType>DocEngine_Template__c</pageOrSobjectType>
+        <type>Flexipage</type>
+        <profile>Admin</profile>
+    </profileActionOverrides>
+    <profileActionOverrides>
+        <actionName>View</actionName>
+        <content>DocEngine_Template_Record_Page</content>
+        <formFactor>Small</formFactor>
+        <pageOrSobjectType>DocEngine_Template__c</pageOrSobjectType>
+        <type>Flexipage</type>
+        <profile>Admin</profile>
+    </profileActionOverrides>
+    <tabs>DocEngine_Template__c</tabs>
+    <tabs>DocEngine_Document__c</tabs>
+    <tabs>DocEngine_Button_Config__c</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>

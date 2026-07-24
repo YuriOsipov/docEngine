@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Current_Version__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Latest published template version used for new fills. Builder Save always creates a new version and points here.</description>
+    <label>Current Version</label>
+    <referenceTo>DocEngine_Template_Version__c</referenceTo>
+    <relationshipLabel>Current For Templates</relationshipLabel>
+    <relationshipName>Current_For_Templates</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

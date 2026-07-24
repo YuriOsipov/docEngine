@@ -1,0 +1,166 @@
+<template>
+  <lightning-card title="Document template builder" icon-name="standard:draft">
+    <div class="slds-p-around_medium">
+      <div class="meta-grid">
+        <lightning-input
+          label="Template name"
+          value={templateName}
+          onchange={handleNameChange}
+          required
+        ></lightning-input>
+        <lightning-input
+          label="Description"
+          value={description}
+          onchange={handleDescriptionChange}
+        ></lightning-input>
+        <lightning-input
+          label="Object API name"
+          value={objectApiName}
+          onchange={handleObjectApiNameChange}
+          placeholder="Account"
+          required
+          disabled={objectApiNameLocked}
+        ></lightning-input>
+        <lightning-input
+          type="toggle"
+          label="Active"
+          checked={isActive}
+          onchange={handleActiveChange}
+        ></lightning-input>
+        <lightning-combobox
+          label="Access Public Group"
+          value={accessGroupId}
+          options={accessGroupOptions}
+          onchange={handleAccessGroupIdChange}
+          placeholder="None — all users with access"
+          field-level-help="Optional. Restrict fill access to members of this Public Group."
+        ></lightning-combobox>
+        <lightning-combobox
+          label="Template version"
+          value={versionId}
+          options={versionOptions}
+          onchange={handleVersionChange}
+          placeholder="Current version"
+          disabled={versionPickerDisabled}
+          field-level-help={saveHint}
+        ></lightning-combobox>
+      </div>
+
+      <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_small toolbar-row">
+        <div class="slds-text-body_small slds-text-color_weak">{modeHint}</div>
+
+        <div class="toolbar-actions">
+          <lightning-input
+            type="toggle"
+            label="Filling mode"
+            checked={fillingMode}
+            onchange={handleFillingModeChange}
+            class="filling-toggle"
+            disabled={editorBusy}
+          ></lightning-input>
+
+          <div class="io-group" title="Full document JSON (structure + values)">
+            <span class="io-group__label">Full document</span>
+            <lightning-button-icon
+              icon-name="utility:download"
+              alternative-text="Export full document"
+              title="Export full document"
+              onclick={handleExportFullDocument}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <lightning-button-icon
+              icon-name="utility:upload"
+              alternative-text="Import full document"
+              title="Import full document"
+              onclick={handleImportFullDocumentClick}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <input
+              type="file"
+              class="file-input"
+              accept="application/json,.json"
+              data-import="full"
+              onchange={handleImportFile}
+            />
+          </div>
+
+          <div class="io-group" title="Template JSON (layout + schemas)">
+            <span class="io-group__label">Template</span>
+            <lightning-button-icon
+              icon-name="utility:download"
+              alternative-text="Export template"
+              title="Export template"
+              onclick={handleExportTemplate}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <lightning-button-icon
+              icon-name="utility:upload"
+              alternative-text="Import template"
+              title="Import template"
+              onclick={handleImportTemplateClick}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <input
+              type="file"
+              class="file-input"
+              accept="application/json,.json"
+              data-import="template"
+              onchange={handleImportFile}
+            />
+          </div>
+
+          <div class="io-group" title="Field values JSON only">
+            <span class="io-group__label">Values</span>
+            <lightning-button-icon
+              icon-name="utility:download"
+              alternative-text="Export values"
+              title="Export values"
+              onclick={handleExportValues}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <lightning-button-icon
+              icon-name="utility:upload"
+              alternative-text="Import values"
+              title="Import values"
+              onclick={handleImportValuesClick}
+              disabled={editorBusy}
+            ></lightning-button-icon>
+            <input
+              type="file"
+              class="file-input"
+              accept="application/json,.json"
+              data-import="values"
+              onchange={handleImportFile}
+            />
+          </div>
+
+          <lightning-button-group>
+            <lightning-button
+              label="Field mapping"
+              onclick={handleFieldMapping}
+              disabled={editorBusy}
+            ></lightning-button>
+            <lightning-button
+              label="Save template"
+              variant="brand"
+              onclick={handleSave}
+              disabled={editorBusy}
+            ></lightning-button>
+          </lightning-button-group>
+
+          <div lwc:dom="manual" class="doc-editor-host__actions doc-actions"></div>
+        </div>
+      </div>
+
+      <div lwc:dom="manual" class="doc-editor-host__sticky sticky-chrome"></div>
+      <div
+        lwc:dom="manual"
+        class="doc-editor-root doc-editor-host doc-editor-host__surface editor-root"
+      ></div>
+
+      <template if:true={statusMessage}>
+        <p class="slds-m-top_small slds-text-body_small slds-text-color_weak">{statusMessage}</p>
+      </template>
+    </div>
+  </lightning-card>
+</template>

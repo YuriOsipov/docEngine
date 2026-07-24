@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+  <head>
+
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Ophthalmology Examination</title>
+
+  </head>
+
+  <body>
+
+    <div class="page">
+
+      <div class="page-sticky-chrome">
+
+      <header class="page-header">
+
+        <h1>Ophthalmology Examination</h1>
+
+        <div class="page-actions">
+
+          <div class="page-actions__mode">
+
+            <label class="design-toggle">
+
+              <input type="checkbox" id="design-mode-toggle" />
+
+              Design mode
+
+            </label>
+
+          </div>
+
+          <div class="page-actions__io">
+
+            <div class="io-group">
+
+              <span class="io-group__label">Full document</span>
+
+              <button type="button" id="btn-save-full-document" class="btn btn-sm btn-icon" aria-label="Save full document"></button>
+
+              <label class="btn btn-secondary btn-sm btn-icon" aria-label="Load full document">
+
+                <input type="file" id="btn-load-full-document" accept="application/json" hidden />
+
+              </label>
+
+            </div>
+
+            <div class="io-group">
+
+              <span class="io-group__label">Template</span>
+
+              <button type="button" id="btn-save-template" class="btn btn-sm btn-icon" aria-label="Save template"></button>
+
+              <label class="btn btn-secondary btn-sm btn-icon" aria-label="Load template">
+
+                <input type="file" id="btn-load-template" accept="application/json" hidden />
+
+              </label>
+
+            </div>
+
+            <div class="io-group">
+
+              <span class="io-group__label">Values</span>
+
+              <button type="button" id="btn-save-fields" class="btn btn-sm btn-icon" aria-label="Save values"></button>
+
+              <label class="btn btn-secondary btn-sm btn-icon" aria-label="Load values">
+
+                <input type="file" id="btn-load-fields" accept="application/json" hidden />
+
+              </label>
+
+            </div>
+
+            <div class="io-group">
+
+              <span class="io-group__label">Mapping</span>
+
+              <button type="button" id="btn-edit-mapping" class="btn btn-sm btn-secondary">Edit</button>
+
+              <button type="button" id="btn-save-mapping" class="btn btn-sm btn-icon" aria-label="Save template with mapping"></button>
+
+              <label class="btn btn-secondary btn-sm btn-icon" aria-label="Load mapping">
+
+                <input type="file" id="btn-load-mapping" accept="application/json" hidden />
+
+              </label>
+
+            </div>
+
+          </div>
+
+          <div class="page-actions__document"></div>
+
+        </div>
+
+      </header>
+
+      </div>
+
+      <main id="editorjs" class="editor-holder"></main>
+
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+
+  </body>
+
+</html>
+

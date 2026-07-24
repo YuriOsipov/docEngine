@@ -1,0 +1,93 @@
+<template>
+  <template if:true={open}>
+    <section class="share-backdrop" role="presentation" onclick={handleBackdropClick}>
+      <div
+        class="share-panel slds-panel slds-panel_docked slds-panel_docked-right slds-is-open"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="docengine-share-title"
+        onclick={handlePanelClick}
+      >
+        <div class="slds-panel__header">
+          <h2 id="docengine-share-title" class="slds-panel__header-title slds-text-heading_small">
+            Share document
+          </h2>
+          <lightning-button-icon
+            icon-name="utility:close"
+            alternative-text="Close"
+            title="Close"
+            onclick={handleClose}
+            disabled={busy}
+          ></lightning-button-icon>
+        </div>
+        <div class="slds-panel__body">
+          <p class="slds-text-body_small slds-m-bottom_small slds-text-color_weak">
+            {filenameLabel}
+          </p>
+
+          <template if:true={canNativeShare}>
+            <lightning-button
+              class="slds-m-bottom_small share-action"
+              label="Share via device…"
+              title="Open the system share sheet (Email, Slack, Teams, …)"
+              onclick={handleNativeShare}
+              disabled={busy}
+            ></lightning-button>
+          </template>
+
+          <lightning-button
+            class="slds-m-bottom_small share-action"
+            label="Copy link"
+            title="Save to Files and copy a public link for email or Slack"
+            onclick={handleCopyLink}
+            disabled={busy}
+          ></lightning-button>
+
+          <div class="slds-m-top_medium">
+            <lightning-input
+              label="Email to"
+              type="text"
+              value={emailTo}
+              placeholder="name@example.com, other@example.com"
+              onchange={handleEmailToChange}
+              disabled={busy}
+            ></lightning-input>
+            <lightning-input
+              class="slds-m-top_x-small"
+              label="Subject"
+              value={emailSubject}
+              onchange={handleEmailSubjectChange}
+              disabled={busy}
+            ></lightning-input>
+            <lightning-textarea
+              class="slds-m-top_x-small"
+              label="Message"
+              value={emailBody}
+              onchange={handleEmailBodyChange}
+              disabled={busy}
+            ></lightning-textarea>
+            <lightning-input
+              class="slds-m-top_x-small"
+              type="checkbox"
+              label="Create a task"
+              checked={createTask}
+              onchange={handleCreateTaskChange}
+              disabled={busy}
+            ></lightning-input>
+            <lightning-button
+              class="slds-m-top_small"
+              variant="brand"
+              label="Send email"
+              onclick={handleSendEmail}
+              disabled={busy}
+            ></lightning-button>
+          </div>
+
+          <template if:true={statusMessage}>
+            <p class="slds-m-top_small slds-text-body_small slds-text-color_weak">{statusMessage}</p>
+          </template>
+        </div>
+      </div>
+    </section>
+  </template>
+</template>

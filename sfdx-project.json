@@ -1,0 +1,39 @@
+{
+  "packageDirectories": [
+    {
+      "path": "apps/salesforce/force-app",
+      "default": true,
+      "package": "DocEngine",
+      "versionName": "ver 0.1.0",
+      "versionNumber": "0.1.0.NEXT",
+      "versionDescription": "Document template design and fill for Salesforce.",
+      "definitionFile": "config/project-scratch-def.json",
+      "postInstallScript": "DocEnginePostInstall",
+      "apexTestAccess": {
+        "permissionSets": ["DocEngine_Admin"]
+      }
+    },
+    {
+      "path": "apps/salesforce/force-app-pdf",
+      "package": "DocEngine_PDF",
+      "versionName": "ver 0.1.0",
+      "versionNumber": "0.1.0.NEXT",
+      "versionDescription": "Optional PDF connector for DocEngine (Named Credential → pdf-service).",
+      "definitionFile": "config/project-scratch-def.json",
+      "dependencies": [
+        {
+          "package": "DocEngine",
+          "versionNumber": "0.1.0.LATEST"
+        }
+      ],
+      "apexTestAccess": {
+        "permissionSets": ["DocEngine_PDF_User", "DocEngine_Admin"]
+      }
+    }
+  ],
+  "name": "docengine",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "62.0",
+  "packageAliases": {}
+}

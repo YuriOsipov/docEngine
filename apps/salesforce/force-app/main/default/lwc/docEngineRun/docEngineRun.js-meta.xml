@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>DocEngine Run (Button)</masterLabel>
+    <description>
+      Record Quick Action / App Page runner: fixed template, fill on/off, export pdf/html, show/skip preview.
+      Configure via DocEngine_Button_Config__c (Developer Name e.g. Account_Generate_Document) or URL / design properties.
+    </description>
+    <targets>
+        <target>lightning__RecordAction</target>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordAction">
+            <actionType>ScreenAction</actionType>
+        </targetConfig>
+        <targetConfig targets="lightning__RecordPage,lightning__AppPage">
+            <property name="recordId" type="String" label="Record Id" />
+            <property
+                name="configName"
+                type="String"
+                label="Button config Developer Name"
+                description="DocEngine_Button_Config__c.Developer_Name__c e.g. Account_Generate_Document"
+            />
+            <property name="templateId" type="String" label="Template Id (override)" />
+            <property
+                name="fillMode"
+                type="String"
+                label="Filling on (true/false)"
+                default="true"
+            />
+            <property
+                name="exportMode"
+                type="String"
+                label="Export (none|pdf|html)"
+                default="none"
+            />
+            <property
+                name="showPreview"
+                type="String"
+                label="Show preview (true/false)"
+                default="true"
+            />
+            <property
+                name="hideEmpty"
+                type="String"
+                label="Hide empty fields (true/false)"
+                default="false"
+            />
+            <property
+                name="attachToRecord"
+                type="String"
+                label="Attach to record files (true/false)"
+                default="false"
+            />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

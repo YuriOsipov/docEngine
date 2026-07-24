@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Immutable snapshot of a DocEngine template (JSON + mapping) at a given version number. Created on template save; documents pin a version.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>DocEngine Template Version</label>
+    <nameField>
+        <displayFormat>TV-{00000}</displayFormat>
+        <label>Template Version Number</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>DocEngine Template Versions</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+</CustomObject>

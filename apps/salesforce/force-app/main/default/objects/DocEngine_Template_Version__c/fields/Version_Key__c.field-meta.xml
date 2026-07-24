@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Version_Key__c</fullName>
+    <caseSensitive>false</caseSensitive>
+    <description>Unique key TemplateId_Version for find-or-create upserts (e.g. a0X…_3).</description>
+    <externalId>true</externalId>
+    <label>Version Key</label>
+    <length>40</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>true</unique>
+</CustomField>

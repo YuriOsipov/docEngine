@@ -1,0 +1,22 @@
+/**
+ * Ophthalmology demo — host shell overrides only.
+ * Editor UI theme lives in @docengine/editor/themes/bridge.css.
+ */
+
+body {
+  font-family: var(--me-document-font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .page-sticky-chrome,
+  .page-header,
+  .page-actions {
+    display: none !important;
+  }
+}

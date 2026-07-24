@@ -1,0 +1,1302 @@
+/*
+ * editor-theme.css
+ * Scoped to .editor-holder — maps every hardcoded color in editor.css to
+ * PrimeVue Aura CSS custom properties so the Full Editor matches the app theme.
+ * Dark-mode is handled automatically because --p-* tokens flip under .dark-mode.
+ */
+
+/* ── 1. Bridge --me-* tokens to PrimeVue tokens ─────────────────────────── */
+.editor-holder {
+  --me-field-fill-color: var(--p-primary-color);
+  --me-field-active-outline: var(--p-primary-color);
+  --me-document-font-family: var(--p-font-family, Inter, ui-sans-serif, system-ui, sans-serif);
+}
+
+/* Dark canvas: pure link-blue (#0000FF) and dark primary are hard to read.
+   Prefer a soft sky accent + light tint behind empty / design placeholders.
+   !important beats inline --me-field-fill-* from applyFieldHighlightCssVars. */
+html.dark-mode .editor-holder {
+  --me-field-fill-color: #7dd3fc;
+  --me-field-fill-bg: color-mix(in srgb, #38bdf8 16%, transparent);
+  --me-field-active-outline: #38bdf8;
+}
+
+html.dark-mode .editor-holder .field-token,
+html.dark-mode .editor-holder .field-token--empty:not(.field-token--required-missing) {
+  color: #7dd3fc;
+}
+
+html.dark-mode .editor-holder .document-section__body .field-token--empty:not(.field-token--required-missing):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image),
+html.dark-mode .editor-holder .vision-table .field-token--cell.field-token--empty:not(.field-token--required-missing):not(.field-token--readonly),
+html.dark-mode .editor-holder .document-section__body .field-token--design.field-token--empty:not(.field-token--required-missing):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image),
+html.dark-mode .editor-holder .vision-table .field-token--cell.field-token--design.field-token--empty:not(.field-token--readonly):not(.field-token--required-missing) {
+  color: #7dd3fc !important;
+  background: color-mix(in srgb, #38bdf8 16%, transparent) !important;
+  text-decoration-color: #7dd3fc !important;
+}
+
+html.dark-mode .editor-holder .field-token--design {
+  outline-color: color-mix(in srgb, #7dd3fc 55%, var(--p-surface-300));
+}
+
+html.dark-mode .editor-holder .field-token--design:hover {
+  background-color: color-mix(in srgb, #38bdf8 12%, transparent);
+}
+
+html.dark-mode .editor-holder .field-token--selected {
+  outline-color: #38bdf8;
+}
+
+/* ── 1b. Invert the surface steps used by the editor ─────────────────────────
+ * PrimeVue Aura's raw --p-surface-0..950 palette is a FIXED light→dark ramp
+ * that does NOT flip in dark mode (surface-0 stays #fff, surface-950 stays
+ * near-black). Only semantic tokens (--p-content-background / --p-text-color /
+ * --p-content-border-color) invert. Every background/border in this file was
+ * written against the raw surface steps, so in dark mode they stayed light
+ * (e.g. white modal + white text = invisible). Re-map the steps we use to
+ * mode-aware values derived from the semantic tokens, scoped to the editor
+ * chrome (including design-shell side panels) and modals so PrimeVue's own
+ * components are unaffected.
+ */
+.editor-panel,
+.editor-holder,
+.editor-top-chrome,
+.document-actions,
+.design-shell,
+.modal-overlay {
+  --p-surface-0: var(--p-content-background);
+  --p-surface-50: color-mix(in srgb, var(--p-content-background) 96%, var(--p-text-color));
+  --p-surface-100: color-mix(in srgb, var(--p-content-background) 92%, var(--p-text-color));
+  --p-surface-200: color-mix(in srgb, var(--p-content-background) 86%, var(--p-text-color));
+  --p-surface-300: color-mix(in srgb, var(--p-content-background) 76%, var(--p-text-color));
+  --p-surface-400: color-mix(in srgb, var(--p-content-background) 64%, var(--p-text-color));
+
+  /* Keep bridge/editor --me-* tokens in sync with remapped surfaces. */
+  --me-surface-0: var(--p-surface-0);
+  --me-surface-50: var(--p-surface-50);
+  --me-surface-100: var(--p-surface-100);
+  --me-surface-200: var(--p-surface-200);
+  --me-surface-300: var(--p-surface-300);
+  --me-surface-muted: var(--p-surface-50);
+  --me-border: var(--p-content-border-color);
+  --me-border-strong: var(--p-content-border-color);
+  --me-border-input: var(--p-content-border-color);
+  --me-border-subtle: var(--p-surface-200);
+  --me-text: var(--p-text-color);
+  --me-text-body: var(--p-text-color);
+  --me-text-muted: var(--p-text-muted-color);
+  --me-text-subtle: var(--p-text-muted-color);
+  --me-text-placeholder: var(--p-text-muted-color);
+  --me-accent-hover: color-mix(in srgb, var(--p-primary-color) 12%, var(--p-surface-0));
+  --me-accent-hover-border: var(--p-primary-color);
+  --me-accent-surface: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-0));
+  --me-accent-border: color-mix(in srgb, var(--p-primary-color) 28%, var(--p-surface-300));
+  --me-accent-panel: var(--p-surface-100);
+  --me-field-filled-color: var(--p-text-color);
+  --me-field-inert-color: var(--p-text-muted-color);
+  --me-selection-bg: color-mix(in srgb, var(--p-primary-color) 12%, var(--p-surface-0));
+}
+
+/* ── 2. Generic buttons (see also global rules in section 15) ────────────── */
+
+/* ── 3. Document section header ──────────────────────────────────────────── */
+.editor-holder .document-section__header {
+  color: var(--p-text-color);
+  border-bottom-color: var(--p-content-border-color);
+}
+
+.editor-holder .document-section__name-input {
+  border-color: var(--p-surface-300);
+  color: var(--p-text-muted-color);
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .document-section__name-input:focus {
+  border-color: var(--p-primary-color);
+  background: var(--p-surface-0);
+}
+
+.editor-holder .document-section--selected .document-section__header {
+  color: var(--p-primary-color);
+  border-bottom-color: var(--p-primary-color);
+}
+
+.editor-holder .document-section__header--selectable:hover {
+  color: var(--p-primary-color);
+}
+
+.editor-holder .document-section__header--collapsible:not(:has(.document-section__label-input)):hover {
+  color: var(--p-primary-color);
+}
+
+.editor-holder .document-section__label-text--placeholder {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .document-section__collapse-btn {
+  border-color: var(--p-surface-300);
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .document-section__collapse-btn:hover {
+  background: var(--p-surface-200);
+  border-color: var(--p-surface-400);
+}
+
+.editor-holder .document-section__label-input {
+  border-color: var(--p-surface-300);
+  background: var(--p-surface-0);
+  border-radius: var(--p-border-radius);
+  color: var(--p-text-color);
+}
+
+.editor-holder .document-section__label-input:focus {
+  border-color: var(--p-primary-color);
+}
+
+/* Document body: on-screen theme remaps page-setup inline colors (often #000)
+   so text stays readable on the dark canvas. PDF/HTML export still uses the
+   data model colors. */
+.editor-holder .document-section__body {
+  color: var(--p-text-color) !important;
+}
+
+.editor-holder .document-section__body h1,
+.editor-holder .document-section__body h2,
+.editor-holder .document-section__body h3 {
+  color: var(--p-text-color) !important;
+}
+
+/* ── 4. Sticky chrome background ─────────────────────────────────────────── */
+.editor-top-chrome--sticky {
+  background: var(--p-content-background);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--p-surface-950) 8%, transparent);
+}
+
+/* ── 5. Rich-text toolbar — unscoped so it also themes the toolbar in the
+ * top chrome (mounted as a sibling of .editor-holder) and inside modals.
+ * editor-theme.css loads after editor.css, so these single-class rules win
+ * ties against the light defaults there. ── */
+.rich-text-toolbar {
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+}
+
+.rich-text-toolbar--field-style {
+  background: color-mix(in srgb, var(--p-primary-color) 6%, var(--p-surface-0));
+  border-color: color-mix(in srgb, var(--p-primary-color) 35%, var(--p-surface-300));
+}
+
+.rich-text-toolbar__btn {
+  border-color: var(--p-surface-300);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+  font-family: var(--p-font-family);
+}
+
+.rich-text-toolbar__btn:hover:not(:disabled) {
+  background: var(--p-surface-200);
+}
+
+.rich-text-toolbar__btn--active {
+  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-0));
+  border-color: var(--p-primary-color);
+}
+
+.rich-text-toolbar__input,
+.rich-text-toolbar__select {
+  border-color: var(--p-surface-400);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+  font-family: var(--p-font-family);
+}
+
+.rich-text-toolbar__input:disabled,
+.rich-text-toolbar__select:disabled {
+  background: var(--p-surface-100);
+}
+
+.rich-text-toolbar__font-group,
+.rich-text-toolbar__align-group,
+.rich-text-toolbar__heading-group {
+  border-left-color: var(--p-content-border-color);
+}
+
+.rich-text-toolbar__title,
+.rich-text-toolbar__label {
+  color: var(--p-text-muted-color);
+}
+
+.rich-text-toolbar__hint {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 6. Drag handle ──────────────────────────────────────────────────────── */
+.editor-holder .editor-drag-handle {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .editor-drag-handle:hover,
+.editor-holder .editor-drag-handle:focus-visible,
+.editor-holder .editor-drag-handle:active {
+  background-color: var(--p-surface-200);
+  border-color: var(--p-surface-300);
+}
+
+/* Floating hint is an always-dark tooltip (surface-950 is a fixed dark step,
+   not remapped above), so its text must stay light in both modes. */
+.editor-holder .editor-drag-handle__hint {
+  background: var(--p-surface-950);
+  color: #fff;
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .editor-drag-handle__hint::before {
+  border-bottom-color: var(--p-surface-950);
+}
+
+.editor-holder .editor-drag-handle__hint-shortcut {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ── 7. Block toolbars (columns / table / repeater) ─────────────────────── */
+.editor-holder .document-columns__toolbar,
+.editor-holder .document-table__toolbar {
+  color: var(--p-text-muted-color);
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .document-columns--selected > .document-columns__toolbar {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-0));
+}
+
+/* delete buttons — see global rules in section 15 */
+
+/* ── 8. Drop indicators ──────────────────────────────────────────────────── */
+.editor-holder .document-section__body.document-section--drop-target,
+.editor-holder .schema-tree__node.is-drop-child > .schema-tree__row,
+.editor-holder .schema-tree__children.is-drop-target {
+  outline-color: var(--p-primary-color);
+}
+
+.editor-holder .editor-drop-caret,
+.editor-holder .field-token--design.is-drop-before,
+.editor-holder .field-token--design.is-drop-after,
+.editor-holder .document-table.is-drop-after,
+.editor-holder .document-columns.is-drop-after {
+  background: var(--p-primary-color);
+}
+
+.editor-holder .field-token--design.is-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--p-primary-color);
+}
+
+.editor-holder .field-token--design.is-drop-after,
+.editor-holder .document-table.is-drop-after,
+.editor-holder .document-columns.is-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--p-primary-color);
+}
+
+.editor-holder .schema-tree__node.is-drop-before > .schema-tree__row {
+  box-shadow: inset 0 2px 0 0 var(--p-primary-color);
+}
+
+.editor-holder .schema-tree__node.is-drop-after > .schema-tree__row {
+  box-shadow: inset 0 -2px 0 0 var(--p-primary-color);
+}
+
+.editor-holder .schema-tree__children.is-drop-target {
+  outline-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-0));
+}
+
+.editor-holder .ce-block.is-drop-before-block {
+  box-shadow: inset 0 3px 0 0 var(--p-primary-color);
+}
+
+.editor-holder .editor-holder--palette-drop {
+  outline-color: var(--p-primary-color);
+}
+
+/* ── 9. Vision table ─────────────────────────────────────────────────────── */
+.editor-holder .vision-table th,
+.editor-holder .vision-table td {
+  border-color: var(--p-surface-400);
+}
+
+.editor-holder .vision-table th {
+  background: var(--p-surface-100);
+}
+
+/* ── 10. Repeater block ──────────────────────────────────────────────────── */
+.editor-holder .repeater-block__instance {
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .repeater-block__instance-header {
+  background: var(--p-surface-50);
+  color: var(--p-text-muted-color);
+  border-bottom-color: var(--p-content-border-color);
+}
+
+.editor-holder .repeater-block__field-label {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .repeater-block__preview,
+.editor-holder .repeater-block__preview-empty {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .field-token__repeater-instance + .field-token__repeater-instance {
+  border-top-color: var(--p-content-border-color);
+}
+
+.editor-holder .field-token__repeater-instance-title {
+  color: var(--p-primary-color);
+}
+
+.editor-holder .field-token__repeater-instance-empty {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .field-token--repeater {
+  border-color: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-300));
+  background: color-mix(in srgb, var(--p-primary-color) 3%, var(--p-surface-0));
+}
+
+/* ── 11. Document repeater ───────────────────────────────────────────────── */
+.editor-holder .document-repeater {
+  border-color: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-300));
+  background: var(--p-surface-50);
+}
+
+.editor-holder .document-repeater__toolbar {
+  border-bottom-color: var(--p-content-border-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-100));
+}
+
+.editor-holder .document-repeater__label {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .document-repeater__delete {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 12. Design mode — block borders ─────────────────────────────────────── */
+body.design-mode .editor-holder .ce-block__content {
+  border-color: var(--p-content-border-color);
+}
+
+/* ── 13. Form blocks ─────────────────────────────────────────────────────── */
+.editor-holder .form-block {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .form-block__label {
+  color: var(--p-text-color);
+}
+
+.editor-holder .form-field label {
+  color: var(--p-text-muted-color);
+}
+
+.editor-holder .form-field input,
+.editor-holder .form-field select {
+  border-color: var(--p-surface-400);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.editor-holder .form-textarea {
+  border-color: var(--p-surface-400);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .form-textarea:focus {
+  border-color: var(--p-primary-color);
+}
+
+/* ── 14. Selection list (see also global rules in section 18c) ───────────── */
+
+/* ── 15. Modal button overrides — scoped under .modal-overlay for (0,2,0) specificity ── */
+.modal-overlay .btn {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.modal-overlay .btn-primary {
+  background: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.modal-overlay .btn-primary:hover {
+  filter: brightness(0.9);
+}
+
+.modal-overlay .btn-secondary:hover,
+.modal-overlay .btn:not(.btn-primary):hover {
+  background: var(--p-surface-200);
+}
+
+.modal-overlay .btn-pick {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.modal-overlay .btn-pick:hover {
+  background: var(--p-surface-200);
+}
+
+.modal-overlay .btn-icon {
+  border-color: var(--p-surface-300);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+/* Buttons inside .editor-holder (toolbar buttons, palette, schema forms) */
+.editor-holder .btn {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .btn-primary {
+  background: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.editor-holder .btn-primary:hover {
+  filter: brightness(0.9);
+}
+
+.editor-holder .btn:not(.btn-primary):hover {
+  background: var(--p-surface-200);
+}
+
+.editor-holder .btn-pick {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .btn-pick:hover {
+  background: var(--p-surface-200);
+}
+
+.editor-holder .btn-icon {
+  border-color: var(--p-surface-300);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .btn-palette,
+.editor-holder .btn-sm {
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .btn-palette:hover {
+  background: var(--p-surface-50);
+}
+
+/* Danger delete buttons (columns / table / vision table row) */
+.document-columns__delete,
+.document-table__delete,
+.vision-table__row-remove {
+  border-color: var(--p-red-500, #ef4444);
+  background: var(--p-surface-0);
+  color: var(--p-red-500, #ef4444);
+  border-radius: var(--p-border-radius);
+}
+
+.document-columns__delete:hover,
+.document-table__delete:hover,
+.vision-table__row-remove:hover {
+  background: var(--p-red-50, #fef2f2);
+}
+
+.selection-list__remove {
+  color: var(--p-red-500, #ef4444);
+}
+
+.selection-list__remove:hover {
+  color: var(--p-red-700, #b91c1c);
+}
+
+/* ── 19. Modals — all selectors use .modal-overlay prefix for (0,2,0) specificity
+        so they always beat editor.css single-class rules regardless of load order ── */
+
+.modal-overlay {
+  background: var(--p-mask-background, rgba(0, 0, 0, 0.45));
+}
+
+.modal-overlay .modal {
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  box-shadow: var(--p-overlay-modal-shadow, 0 8px 32px rgba(0, 0, 0, 0.25));
+  color: var(--p-text-color);
+}
+
+.modal-overlay .modal__header {
+  background: var(--p-surface-100);
+  border-bottom-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius) var(--p-border-radius) 0 0;
+}
+
+.modal-overlay .modal__body {
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.modal-overlay .modal__footer {
+  background: var(--p-surface-100);
+  border-top-color: var(--p-content-border-color);
+  border-radius: 0 0 var(--p-border-radius) var(--p-border-radius);
+}
+
+.modal-overlay .modal__search,
+.modal-overlay .modal__input,
+.modal-overlay .modal__textarea,
+.modal-overlay .modal__number {
+  border-color: var(--p-surface-400);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  font-family: var(--p-font-family);
+}
+
+.modal-overlay .modal__search:focus,
+.modal-overlay .modal__input:focus,
+.modal-overlay .modal__textarea:focus,
+.modal-overlay .modal__number:focus {
+  border-color: var(--p-primary-color);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--p-primary-color);
+}
+
+.modal-overlay .modal__status {
+  color: var(--p-text-muted-color);
+}
+
+.modal-overlay .modal__status--error {
+  color: var(--p-red-500, #ef4444);
+}
+
+.modal-overlay .modal__error {
+  color: var(--p-red-500, #ef4444);
+}
+
+.modal-overlay .modal__hint {
+  color: var(--p-text-muted-color);
+}
+
+.modal-overlay .modal__custom-entries-label {
+  color: var(--p-text-color);
+}
+
+.modal-overlay .modal__custom-entries-input {
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  font-family: var(--p-font-family);
+}
+
+.modal-overlay .schema-editor-modal__field-id {
+  color: var(--p-text-muted-color);
+}
+
+/* List root scroll area */
+.modal-overlay .list-root,
+.modal-overlay .tree-root {
+  background: var(--p-surface-0);
+}
+
+/* ── 16. HTML-text modal toolbar (see global rules in section 18b) ───────── */
+
+/* ── 17. Tree picker — scoped under .modal-overlay for (0,2,0) specificity ── */
+.modal-overlay .tree-node__row:hover {
+  background: var(--p-surface-100);
+}
+
+.modal-overlay .tree-node__toggle {
+  color: var(--p-text-muted-color);
+}
+
+.modal-overlay .tree-node__label {
+  color: var(--p-text-color);
+}
+
+/* Native checkboxes use the brand accent when checked */
+.modal-overlay .tree-node__checkbox,
+.editor-holder input[type="checkbox"] {
+  accent-color: var(--p-primary-color);
+}
+
+/* Disabled parent-node checkboxes: dim instead of opaque dark block */
+.modal-overlay .tree-node__checkbox:disabled {
+  opacity: 0.45;
+}
+
+/* ── 18. List picker — scoped under .modal-overlay ──────────────────────── */
+.modal-overlay .list-item:hover {
+  background: var(--p-surface-100);
+}
+
+.modal-overlay .list-item__code {
+  color: var(--p-text-muted-color);
+}
+
+.modal-overlay .list-item__label {
+  color: var(--p-text-color);
+}
+
+/* Search-match highlight stays readable in both light and dark mode */
+.modal-overlay .list-item__highlight {
+  background: var(--p-yellow-200, #fde68a);
+  color: #1a1a1a;
+  border-radius: var(--p-border-radius);
+}
+
+/* ── 18b. HTML-text modal toolbar — scoped under .modal-overlay ──────────── */
+.modal-overlay .html-text-modal__toolbar {
+  background: var(--p-surface-100);
+  border-bottom-color: var(--p-content-border-color);
+}
+
+.modal-overlay .html-text-modal__align-group,
+.modal-overlay .html-text-modal__heading-group {
+  border-left-color: var(--p-content-border-color);
+}
+
+.modal-overlay .html-text-modal__editor {
+  border-color: var(--p-surface-400);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.modal-overlay .html-text-modal__editor:focus {
+  border-color: var(--p-primary-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color) 20%, transparent);
+}
+
+/* ── 18c. Selection list — scoped under .modal-overlay ──────────────────── */
+.modal-overlay .selection-list {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-0);
+  border-radius: var(--p-border-radius);
+}
+
+.modal-overlay .selection-list__item {
+  border-bottom-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+}
+
+.modal-overlay .selection-list__empty {
+  color: var(--p-text-muted-color);
+}
+
+.modal-overlay .selection-list__remove {
+  color: var(--p-red-500, #ef4444);
+}
+
+.modal-overlay .selection-list__remove:hover {
+  color: var(--p-red-700, #b91c1c);
+}
+
+/* ── 19. Field tokens (design mode) ──────────────────────────────────────── */
+.editor-holder .field-token--design {
+  outline-color: color-mix(in srgb, var(--p-primary-color) 60%, var(--p-surface-300));
+}
+
+.editor-holder .field-token--design:hover {
+  background-color: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+}
+
+.editor-holder .field-token--selected {
+  outline-color: var(--p-primary-color);
+}
+
+.editor-holder .field-token--required {
+  outline-color: var(--p-yellow-400, #facc15);
+}
+
+.editor-holder .field-token--required-missing {
+  background: var(--p-yellow-50, #fefce8);
+  outline-color: var(--p-yellow-500, #eab308);
+}
+
+.editor-holder .field-token--required-missing.field-token--empty {
+  color: var(--p-yellow-800, #854d0e);
+}
+
+.editor-holder .field-token {
+  color: var(--p-primary-color);
+}
+
+.editor-holder .field-token--empty {
+  color: var(--p-primary-color);
+}
+
+.editor-holder .field-token--computed {
+  color: var(--p-text-color);
+}
+
+/* Filled field VALUES also carry inline `color:#000` (applyFieldDisplayStyle),
+   so !important is required to re-theme them on the dark canvas. Empty
+   placeholders (primary) and required-missing (amber) are excluded. */
+.editor-holder .document-section__body .field-token:not(.field-token--empty):not(.field-token--required-missing),
+.editor-holder .vision-table .field-token--cell:not(.field-token--empty):not(.field-token--required-missing),
+.editor-holder .document-columns__col {
+  color: var(--p-text-color) !important;
+}
+
+.editor-holder .field-token__thumb {
+  border-color: var(--p-content-border-color);
+}
+
+.editor-holder .field-token__caption {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 20. Required-missing field highlight (fill mode) ───────────────────── */
+.editor-holder .editor-holder--show-fields .document-section__body .field-token:not(.field-token--design).field-token--required-missing,
+.editor-holder .editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design).field-token--required-missing {
+  background: var(--p-yellow-50, #fefce8);
+  color: var(--p-yellow-800, #854d0e);
+  text-decoration-color: var(--p-yellow-800, #854d0e);
+  outline-color: var(--p-yellow-500, #eab308);
+}
+
+/* ── 21. Image modal ─────────────────────────────────────────────────────── */
+.image-modal__preview img {
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+}
+
+/* ── 22. Design mode shell & panels ────────────────────────────────────────
+ * Panels live under .design-shell (sibling chrome around .editor-holder), so
+ * rules must target .editor-panel / .design-shell — not .editor-holder .….
+ */
+.editor-panel .design-shell--active,
+.design-shell--active {
+  background: var(--p-surface-200);
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  color: var(--p-text-color);
+}
+
+.editor-panel .design-panel,
+.design-shell .design-panel {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.editor-panel .design-panel--left,
+.design-shell .design-panel--left {
+  border-right-color: var(--p-content-border-color);
+  background: var(--p-surface-100);
+}
+
+.editor-panel .design-panel--center,
+.design-shell .design-panel--center {
+  background: var(--p-surface-200);
+}
+
+.editor-panel .design-shell--active .design-panel--right,
+.design-shell--active .design-panel--right {
+  border-left-color: var(--p-content-border-color);
+  background: var(--p-surface-100);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-panel .design-shell--active > .design-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-panel .properties-panel,
+.design-shell .properties-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.editor-panel .properties-panel__body,
+.design-shell .properties-panel__body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  background: var(--p-surface-100);
+}
+
+.editor-panel .design-panel__editor-scroll,
+.design-shell .design-panel__editor-scroll {
+  /* Dark theme: document canvas matches chrome (light text on dark surface). */
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  color: var(--p-text-color);
+}
+
+/* Fill mode drops .design-shell--active; editor.css forces #fff on the scroll
+   area — beat that so fill mode keeps the same dark canvas as design mode. */
+.editor-panel,
+.editor-panel .design-shell,
+.design-shell {
+  background: var(--p-surface-0);
+}
+
+.editor-panel .design-shell:not(.design-shell--active) .design-panel__editor-scroll,
+.design-shell:not(.design-shell--active) .design-panel__editor-scroll,
+.editor-panel .design-shell:not(.design-shell--active) .design-panel--center,
+.design-shell:not(.design-shell--active) .design-panel--center {
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.editor-panel .design-shell:not(.design-shell--active) .editor-holder,
+.design-shell:not(.design-shell--active) .editor-holder {
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+}
+
+/* Fill-mode hover / filled pills — light blues on white look invisible; use
+   dark-canvas-friendly surfaces. */
+html.dark-mode .editor-holder--show-fields .field-token:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):hover {
+  background: color-mix(in srgb, #38bdf8 14%, transparent);
+}
+
+html.dark-mode .editor-holder--show-fields .field-token:not(.field-token--design):not(.field-token--empty):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image):not(.field-token--required-missing) {
+  background-color: var(--p-surface-200);
+  color: var(--p-text-color);
+}
+
+.editor-panel .design-panel__toolbar,
+.design-shell .design-panel__toolbar {
+  color: var(--p-text-color);
+}
+
+.editor-panel .properties-panel__setup-btn,
+.design-shell .properties-panel__setup-btn {
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+}
+
+.editor-panel .properties-panel__setup-btn:hover,
+.design-shell .properties-panel__setup-btn:hover {
+  background: var(--p-surface-50);
+  border-color: var(--p-primary-color);
+}
+
+.editor-panel .rich-text-toolbar,
+.design-shell .rich-text-toolbar {
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+}
+
+/* ── 23. Field palette ───────────────────────────────────────────────────── */
+.editor-panel .field-palette,
+.design-shell .field-palette {
+  background: transparent;
+  border-color: transparent;
+  color: var(--p-text-color);
+}
+
+.editor-panel .field-palette__header,
+.editor-panel .field-palette__footer,
+.editor-panel .field-palette__body,
+.design-shell .field-palette__header,
+.design-shell .field-palette__footer,
+.design-shell .field-palette__body {
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+}
+
+.editor-panel .field-palette__title,
+.design-shell .field-palette__title {
+  color: var(--p-text-color);
+}
+
+.editor-panel .field-palette__group-title,
+.design-shell .field-palette__group-title {
+  color: var(--p-text-muted-color);
+}
+
+.editor-panel .field-palette__item,
+.design-shell .field-palette__item {
+  background: var(--p-surface-0);
+  border-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-panel .field-palette__item:hover,
+.design-shell .field-palette__item:hover {
+  background: var(--p-surface-50);
+  border-color: var(--p-primary-color);
+}
+
+.editor-panel .field-palette__hint,
+.design-shell .field-palette__hint {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 24. Properties panel ────────────────────────────────────────────────── */
+.editor-panel .properties-panel__header,
+.editor-panel .properties-panel__footer,
+.design-shell .properties-panel__header,
+.design-shell .properties-panel__footer {
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+}
+
+.editor-panel .properties-panel__title,
+.design-shell .properties-panel__title {
+  color: var(--p-text-color);
+}
+
+.editor-panel .properties-panel__subtitle,
+.editor-panel .properties-panel__empty,
+.editor-panel .properties-panel__field-id,
+.design-shell .properties-panel__subtitle,
+.design-shell .properties-panel__empty,
+.design-shell .properties-panel__field-id {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 25. Display-style form & schema form ────────────────────────────────── */
+.editor-panel .display-style-form,
+.design-shell .display-style-form,
+.editor-holder .display-style-form {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+  color: var(--p-text-color);
+}
+
+.editor-panel .display-style-form__preview,
+.design-shell .display-style-form__preview,
+.editor-holder .display-style-form__preview,
+.editor-panel .field-highlight-form__preview,
+.design-shell .field-highlight-form__preview,
+.editor-holder .field-highlight-form__preview {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+/* Page-setup defaults use #000; beat inline preview color so samples stay
+   readable on the dark form surface (same remapping as the document canvas). */
+html.dark-mode .editor-panel .display-style-form__preview,
+html.dark-mode .design-shell .display-style-form__preview,
+html.dark-mode .editor-holder .display-style-form__preview,
+html.dark-mode .editor-panel .field-highlight-form__preview-sample,
+html.dark-mode .design-shell .field-highlight-form__preview-sample {
+  color: var(--p-text-color) !important;
+}
+
+html.dark-mode .editor-panel .field-highlight-form__preview-token,
+html.dark-mode .design-shell .field-highlight-form__preview-token {
+  /* Empty-field sample keeps the sky accent; don't force body text color. */
+  color: #7dd3fc !important;
+}
+
+.editor-panel .display-style-form__toolbar,
+.design-shell .display-style-form__toolbar,
+.editor-holder .display-style-form__toolbar {
+  background: var(--p-surface-100);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  padding: 8px;
+}
+
+.editor-panel .display-style-form__legend,
+.design-shell .display-style-form__legend,
+.editor-holder .display-style-form__legend {
+  color: var(--p-text-color);
+}
+
+.editor-panel .schema-form__row span,
+.design-shell .schema-form__row span,
+.editor-holder .schema-form__row span {
+  color: var(--p-text-muted-color);
+}
+
+.editor-panel .schema-form__row input,
+.editor-panel .schema-form__row select,
+.editor-panel .schema-form__row textarea,
+.design-shell .schema-form__row input,
+.design-shell .schema-form__row select,
+.design-shell .schema-form__row textarea,
+.editor-holder .schema-form__row input,
+.editor-holder .schema-form__row select,
+.editor-holder .schema-items__row input,
+.editor-holder .schema-tree__row input {
+  border-color: var(--p-surface-400);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.editor-panel .schema-form__row input[readonly],
+.design-shell .schema-form__row input[readonly],
+.editor-holder .schema-form__row input[readonly] {
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+}
+
+.editor-panel .schema-form__hint,
+.design-shell .schema-form__hint,
+.editor-holder .schema-form__hint {
+  color: var(--p-text-muted-color);
+}
+
+.editor-panel .schema-form__hint--error,
+.design-shell .schema-form__hint--error,
+.editor-holder .schema-form__hint--error {
+  color: var(--p-red-600, #dc2626);
+}
+
+.editor-panel .btn,
+.design-shell .btn {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-panel .btn-primary,
+.design-shell .btn-primary {
+  background: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.editor-panel .btn-primary:hover,
+.design-shell .btn-primary:hover {
+  filter: brightness(0.9);
+}
+
+.editor-panel .btn:not(.btn-primary):hover,
+.design-shell .btn:not(.btn-primary):hover {
+  background: var(--p-surface-200);
+}
+
+/* ── Design panel typography inherits page-setup text style ─────────────── */
+.editor-holder .design-shell .properties-panel,
+.editor-holder .design-shell .field-palette,
+.editor-holder .design-shell .design-panel__toolbar,
+.editor-holder .editor-top-chrome,
+.modal-overlay .modal--schema-designer,
+.modal-overlay .modal.modal--wide:has(.schema-editor) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+}
+
+.editor-holder .design-shell .properties-panel__title,
+.editor-holder .design-shell .properties-panel__subtitle,
+.editor-holder .design-shell .properties-panel__empty,
+.editor-holder .design-shell .properties-panel__field-id,
+.editor-holder .design-shell .schema-form__row span,
+.editor-holder .design-shell .schema-form__row input,
+.editor-holder .design-shell .schema-form__row select,
+.editor-holder .design-shell .schema-form__row textarea,
+.editor-holder .design-shell .schema-form__hint,
+.editor-holder .design-shell .field-palette__group-title,
+.editor-holder .design-shell .field-palette__item,
+.editor-holder .design-shell .display-style-form,
+.editor-holder .design-shell .display-style-form legend,
+.editor-holder .design-shell .display-style-form label,
+.editor-holder .design-shell .display-style-form input,
+.editor-holder .design-shell .display-style-form select,
+.editor-holder .design-shell .display-style-form__preview,
+.editor-holder .design-shell .display-style-form__reset,
+.editor-panel .design-shell .display-style-form,
+.editor-panel .design-shell .display-style-form legend,
+.editor-panel .design-shell .display-style-form input,
+.editor-panel .design-shell .display-style-form select,
+.editor-panel .design-shell .display-style-form__preview,
+.editor-panel .design-shell .display-style-form__reset,
+.editor-holder .design-shell .field-highlight-form,
+.editor-holder .design-shell .field-highlight-form legend,
+.editor-holder .design-shell .field-highlight-form label,
+.editor-holder .design-shell .field-highlight-form input,
+.editor-holder .design-shell .btn,
+.modal-overlay .modal--schema-designer .schema-form__row span,
+.modal-overlay .modal--schema-designer .schema-form__row input,
+.modal-overlay .modal--schema-designer .schema-form__hint,
+.modal-overlay .modal--schema-designer .schema-items__row input,
+.modal-overlay .modal--schema-designer .schema-tree__row input,
+.modal-overlay .modal--schema-designer .btn,
+.modal-overlay .modal.modal--wide:has(.schema-editor) .schema-form__row span,
+.modal-overlay .modal.modal--wide:has(.schema-editor) .schema-form__row input,
+.modal-overlay .modal.modal--wide:has(.schema-editor) .schema-editor-modal__title,
+.modal-overlay .modal.modal--wide:has(.schema-editor) .schema-editor-modal__field-id,
+.modal-overlay .modal.modal--wide:has(.schema-editor) .btn {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+}
+
+.editor-holder .schema-tree-scroll {
+  border-color: var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-50);
+}
+
+/* ── 26. Design toggle ───────────────────────────────────────────────────── */
+.editor-holder .design-toggle {
+  background: var(--p-surface-0);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+/* ── 27. Document actions toolbar — unscoped (mounted as sibling of .editor-holder) */
+.document-actions__title {
+  color: var(--p-text-muted-color);
+}
+
+.document-actions .btn {
+  background: var(--p-surface-100);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}
+
+.document-actions .btn:hover:not(:disabled) {
+  background: var(--p-surface-200);
+  border-color: var(--p-surface-400);
+}
+
+.document-actions .btn:disabled {
+  opacity: 0.5;
+}
+
+/* ── 28. Template block ──────────────────────────────────────────────────── */
+.editor-holder .document-section__design-bar,
+.editor-holder .template-block__toolbar {
+  border-bottom-color: var(--p-content-border-color);
+}
+
+.editor-holder .template-block__type {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 29. Formula field picker ────────────────────────────────────────────── */
+.editor-holder .formula-field-picker {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+.editor-holder .formula-field-picker__leaf:hover {
+  background: color-mix(in srgb, var(--p-primary-color) 8%, var(--p-surface-0));
+}
+
+.editor-holder .formula-field-picker__functions-label {
+  color: var(--p-text-muted-color);
+}
+
+/* ── 30. App notifications ───────────────────────────────────────────────── */
+.app-notification--error {
+  background: var(--p-red-50, #fef2f2);
+  border-color: var(--p-red-200, #fecaca);
+  color: var(--p-red-800, #991b1b);
+}
+
+/* Preview modal matches themed editor canvas (dark surface + light text). */
+.modal-overlay .preview-modal__html {
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+}
+
+.modal-overlay .preview-document {
+  color: var(--p-text-color) !important;
+}
+
+.modal-overlay .preview-document__section.document-section__body,
+.modal-overlay .preview-document .document-section__body {
+  color: var(--p-text-color) !important;
+}
+
+.modal-overlay .preview-document .document-section__header,
+.modal-overlay .preview-document .document-section__label-text,
+.modal-overlay .preview-document__title {
+  color: var(--p-text-color);
+}
+
+.modal-overlay .preview-document .field-token--preview:not(.field-token--image):not(.field-token--empty) {
+  color: var(--p-text-color) !important;
+}
+
+.modal-overlay .preview-document h1,
+.modal-overlay .preview-document h2,
+.modal-overlay .preview-document h3 {
+  color: var(--p-text-color) !important;
+}
+
+.modal-overlay .preview-document__empty {
+  color: var(--p-text-muted-color);
+}
+
+.preview-modal__loading {
+  background: var(--p-surface-0);
+  color: var(--p-text-muted-color);
+}
+
+.preview-modal__loading--error {
+  color: var(--p-red-600, #dc2626);
+}
+
+.preview-pdf-export__status {
+  background: var(--p-surface-100);
+  border-color: var(--p-content-border-color);
+  color: var(--p-text-color);
+  border-radius: var(--p-border-radius);
+}

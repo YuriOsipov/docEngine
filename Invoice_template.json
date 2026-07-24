@@ -1,0 +1,384 @@
+{
+  "kind": "template",
+  "version": 1,
+  "time": 1753113600000,
+  "pageSetup": {
+    "format": "a4",
+    "orientation": "portrait",
+    "margin": 15,
+    "title": "Invoice",
+    "textStyle": {
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": "11px"
+    },
+    "valueStyle": {
+      "fontFamily": "Helvetica, Arial, sans-serif",
+      "fontSize": "11px"
+    }
+  },
+  "fieldSchemas": {
+    "orderNumber": {
+      "type": "text",
+      "name": "Order Number",
+      "label": "Order #"
+    },
+    "printedAt": {
+      "type": "text",
+      "name": "Printed At",
+      "label": "Printed"
+    },
+    "documentType": {
+      "type": "text",
+      "name": "Document Type",
+      "label": "Type",
+      "defaultText": "Invoice"
+    },
+    "sellerName": {
+      "type": "text",
+      "name": "Seller Name",
+      "label": "Seller",
+      "defaultText": "GoldenDent"
+    },
+    "sellerAddress": {
+      "type": "text",
+      "name": "Seller Address",
+      "label": "Address",
+      "defaultText": "27251 Gratiot Avenue, Roseville, Michigan 48066, USA"
+    },
+    "sellerTelephone": {
+      "type": "text",
+      "name": "Seller Telephone",
+      "label": "Telephone",
+      "defaultText": "1-800-308-0518 / 586-779-0400"
+    },
+    "sellerFax": {
+      "type": "text",
+      "name": "Seller Fax",
+      "label": "Fax",
+      "defaultText": "586-779-8080"
+    },
+    "sellerEmail": {
+      "type": "text",
+      "name": "Seller Email",
+      "label": "E-Mail",
+      "defaultText": "info@goldendent.com"
+    },
+    "sellerWebsite": {
+      "type": "text",
+      "name": "Seller Website",
+      "label": "Web Site",
+      "defaultText": "https://www.goldendent.com"
+    },
+    "dateAdded": {
+      "type": "text",
+      "name": "Date Added",
+      "label": "Date Added"
+    },
+    "orderId": {
+      "type": "text",
+      "name": "Order ID",
+      "label": "Order ID"
+    },
+    "paymentMethod": {
+      "type": "text",
+      "name": "Payment Method",
+      "label": "Payment Method"
+    },
+    "shippingMethod": {
+      "type": "text",
+      "name": "Shipping Method",
+      "label": "Shipping Method"
+    },
+    "paymentName": {
+      "type": "text",
+      "name": "Payment Name",
+      "label": "Name"
+    },
+    "paymentCompany": {
+      "type": "text",
+      "name": "Payment Company",
+      "label": "Company"
+    },
+    "paymentAddress": {
+      "type": "text",
+      "name": "Payment Address",
+      "label": "Address"
+    },
+    "shippingName": {
+      "type": "text",
+      "name": "Shipping Name",
+      "label": "Name"
+    },
+    "shippingCompany": {
+      "type": "text",
+      "name": "Shipping Company",
+      "label": "Company"
+    },
+    "shippingAddress": {
+      "type": "text",
+      "name": "Shipping Address",
+      "label": "Address"
+    },
+    "shippingTelephone": {
+      "type": "text",
+      "name": "Shipping Telephone",
+      "label": "Telephone"
+    },
+    "shippingEmail": {
+      "type": "text",
+      "name": "Shipping Email",
+      "label": "E-Mail"
+    },
+    "lineItems": {
+      "type": "table",
+      "name": "Line Items",
+      "label": "Products",
+      "columns": [
+        { "key": "product", "name": "Product", "label": "Product", "width": "42%" },
+        { "key": "model", "name": "Model", "label": "Model", "width": "12%" },
+        { "key": "quantity", "name": "Quantity", "label": "Quantity", "width": "12%" },
+        { "key": "unitPrice", "name": "Unit Price", "label": "Unit Price", "width": "17%" },
+        { "key": "total", "name": "Total", "label": "Total", "width": "17%" }
+      ],
+      "rows": [
+        { "key": "r1", "label": "" },
+        { "key": "r2", "label": "" },
+        { "key": "r3", "label": "" }
+      ],
+      "cellType": "text",
+      "showRowLabels": false
+    },
+    "lineItems_r1_product": { "type": "text", "name": "Product", "label": "Product" },
+    "lineItems_r1_model": { "type": "text", "name": "Model", "label": "Model" },
+    "lineItems_r1_quantity": { "type": "text", "name": "Quantity", "label": "Quantity" },
+    "lineItems_r1_unitPrice": { "type": "text", "name": "Unit Price", "label": "Unit Price" },
+    "lineItems_r1_total": { "type": "text", "name": "Total", "label": "Total" },
+    "lineItems_r2_product": { "type": "text", "name": "Product", "label": "Product" },
+    "lineItems_r2_model": { "type": "text", "name": "Model", "label": "Model" },
+    "lineItems_r2_quantity": { "type": "text", "name": "Quantity", "label": "Quantity" },
+    "lineItems_r2_unitPrice": { "type": "text", "name": "Unit Price", "label": "Unit Price" },
+    "lineItems_r2_total": { "type": "text", "name": "Total", "label": "Total" },
+    "lineItems_r3_product": { "type": "text", "name": "Product", "label": "Product" },
+    "lineItems_r3_model": { "type": "text", "name": "Model", "label": "Model" },
+    "lineItems_r3_quantity": { "type": "text", "name": "Quantity", "label": "Quantity" },
+    "lineItems_r3_unitPrice": { "type": "text", "name": "Unit Price", "label": "Unit Price" },
+    "lineItems_r3_total": { "type": "text", "name": "Total", "label": "Total" },
+    "subTotal": {
+      "type": "text",
+      "name": "Sub-Total",
+      "label": "Sub-Total"
+    },
+    "shippingCost": {
+      "type": "text",
+      "name": "Shipping Cost",
+      "label": "Shipping"
+    },
+    "grandTotal": {
+      "type": "text",
+      "name": "Grand Total",
+      "label": "Total",
+      "displayStyle": { "fontWeight": "bold" }
+    }
+  },
+  "blocks": [
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Header",
+        "label": "Header",
+        "segments": [
+          {
+            "type": "columns",
+            "id": "headerCols",
+            "widths": ["1fr", "1fr"],
+            "columns": [
+              [
+                { "type": "text", "html": "<b>Order (#</b>" },
+                { "type": "field", "id": "orderNumber", "placeholder": "393469" },
+                { "type": "text", "html": "<b>)</b>" }
+              ],
+              [
+                { "type": "field", "id": "printedAt", "placeholder": "21/07/2026, 18:21", "align": "right" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "documentType", "placeholder": "Invoice", "align": "right" }
+              ]
+            ]
+          }
+        ],
+        "fieldValues": {
+          "orderNumber": "393469",
+          "printedAt": "21/07/2026, 18:21",
+          "documentType": "Invoice"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Order Details",
+        "label": "Order Details",
+        "segments": [
+          {
+            "type": "columns",
+            "id": "orderDetailsCols",
+            "widths": ["1.2fr", "1fr"],
+            "columns": [
+              [
+                { "type": "field", "id": "sellerName", "placeholder": "GoldenDent" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "sellerAddress", "placeholder": "Address" },
+                { "type": "text", "content": "\nTelephone: " },
+                { "type": "field", "id": "sellerTelephone", "placeholder": "Telephone" },
+                { "type": "text", "content": "\nFax: " },
+                { "type": "field", "id": "sellerFax", "placeholder": "Fax" },
+                { "type": "text", "content": "\nE-Mail: " },
+                { "type": "field", "id": "sellerEmail", "placeholder": "E-Mail" },
+                { "type": "text", "content": "\nWeb Site: " },
+                { "type": "field", "id": "sellerWebsite", "placeholder": "Web Site" }
+              ],
+              [
+                { "type": "text", "html": "<b>Date Added:</b> " },
+                { "type": "field", "id": "dateAdded", "placeholder": "14/07/2026" },
+                { "type": "text", "content": "\n" },
+                { "type": "text", "html": "<b>Order ID:</b> " },
+                { "type": "field", "id": "orderId", "placeholder": "393469" },
+                { "type": "text", "content": "\n" },
+                { "type": "text", "html": "<b>Payment Method:</b> " },
+                { "type": "field", "id": "paymentMethod", "placeholder": "Credit / Debit Card" },
+                { "type": "text", "content": "\n" },
+                { "type": "text", "html": "<b>Shipping Method:</b> " },
+                { "type": "field", "id": "shippingMethod", "placeholder": "UPS Ground" }
+              ]
+            ]
+          }
+        ],
+        "fieldValues": {
+          "sellerName": "GoldenDent",
+          "sellerAddress": "27251 Gratiot Avenue, Roseville, Michigan 48066, USA",
+          "sellerTelephone": "1-800-308-0518 / 586-779-0400",
+          "sellerFax": "586-779-8080",
+          "sellerEmail": "info@goldendent.com",
+          "sellerWebsite": "https://www.goldendent.com",
+          "dateAdded": "14/07/2026",
+          "orderId": "393469",
+          "paymentMethod": "Credit / Debit Card",
+          "shippingMethod": "UPS Ground"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Addresses",
+        "label": "Addresses",
+        "segments": [
+          {
+            "type": "columns",
+            "id": "addressCols",
+            "widths": ["1fr", "1fr"],
+            "columns": [
+              [
+                { "type": "text", "html": "<b>Payment Address</b>\n" },
+                { "type": "field", "id": "paymentName", "placeholder": "Name" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "paymentCompany", "placeholder": "Company" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "paymentAddress", "placeholder": "Address" }
+              ],
+              [
+                { "type": "text", "html": "<b>Shipping Address</b>\n" },
+                { "type": "field", "id": "shippingName", "placeholder": "Name" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "shippingCompany", "placeholder": "Company" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "shippingAddress", "placeholder": "Address" },
+                { "type": "text", "content": "\nTelephone " },
+                { "type": "field", "id": "shippingTelephone", "placeholder": "Telephone" },
+                { "type": "text", "content": "\nE-Mail " },
+                { "type": "field", "id": "shippingEmail", "placeholder": "E-Mail" }
+              ]
+            ]
+          }
+        ],
+        "fieldValues": {
+          "paymentName": "Kris Heap",
+          "paymentCompany": "Inspire Dental",
+          "paymentAddress": "1551 South East Bay Boulevard\nProvo Utah 84606\nUnited States",
+          "shippingName": "Kris Heap",
+          "shippingCompany": "Inspire Dental",
+          "shippingAddress": "1551 South East Bay Boulevard\nProvo Utah 84606\nUnited States",
+          "shippingTelephone": "801-691-3200",
+          "shippingEmail": "kris@inspiredental.com"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Products",
+        "label": "Products",
+        "segments": [
+          {
+            "type": "table",
+            "id": "lineItems",
+            "rows": [
+              { "key": "r1", "label": "" },
+              { "key": "r2", "label": "" },
+              { "key": "r3", "label": "" }
+            ]
+          }
+        ],
+        "fieldValues": {
+          "lineItems_r1_product": "Woodpecker Ai Ray Lite Portable Dental Handheld X-Ray",
+          "lineItems_r1_model": "WXRL",
+          "lineItems_r1_quantity": "1",
+          "lineItems_r1_unitPrice": "$2,947.00",
+          "lineItems_r1_total": "$2,947.00",
+          "lineItems_r2_product": "Woodpecker MT2 Electric Motor (no contra-angle) - Add-On Woodpecker Dental Trolley Cart: None",
+          "lineItems_r2_model": "WTZX",
+          "lineItems_r2_quantity": "1",
+          "lineItems_r2_unitPrice": "$889.35",
+          "lineItems_r2_total": "$889.35",
+          "lineItems_r3_product": "Woodpecker Ai Ray Lite Portable Hand Held X-Ray Cradle",
+          "lineItems_r3_model": "WXRC",
+          "lineItems_r3_quantity": "1",
+          "lineItems_r3_unitPrice": "$107.00",
+          "lineItems_r3_total": "$107.00"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Totals",
+        "label": "Totals",
+        "segments": [
+          {
+            "type": "columns",
+            "id": "totalsCols",
+            "widths": ["1fr", "220px"],
+            "columns": [
+              [],
+              [
+                { "type": "text", "html": "<b>Sub-Total:</b> " },
+                { "type": "field", "id": "subTotal", "placeholder": "$0.00", "align": "right" },
+                { "type": "text", "content": "\n" },
+                { "type": "field", "id": "shippingMethod", "placeholder": "UPS Ground" },
+                { "type": "text", "content": ": " },
+                { "type": "field", "id": "shippingCost", "placeholder": "$0.00", "align": "right" },
+                { "type": "text", "content": "\n" },
+                { "type": "text", "html": "<b>Total:</b> " },
+                { "type": "field", "id": "grandTotal", "placeholder": "$0.00", "align": "right" }
+              ]
+            ]
+          }
+        ],
+        "fieldValues": {
+          "subTotal": "$3,943.35",
+          "shippingCost": "$35.68",
+          "grandTotal": "$3,979.03"
+        }
+      }
+    }
+  ]
+}

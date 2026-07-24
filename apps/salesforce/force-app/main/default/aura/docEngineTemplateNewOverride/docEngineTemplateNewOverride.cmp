@@ -1,0 +1,7 @@
+<aura:component
+    implements="lightning:actionOverride,force:hasSObjectName,lightning:isUrlAddressable"
+    access="global"
+>
+    <!-- Standard New cannot use LWC directly; Aura wrapper required. -->
+    <c:docEngineTemplateNew />
+</aura:component>

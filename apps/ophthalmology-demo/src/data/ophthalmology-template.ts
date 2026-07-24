@@ -1,0 +1,170 @@
+// @ts-nocheck
+import { ophthalmologySchemas } from './ophthalmology-schemas.js';
+
+const examSegments = [
+  { type: 'text', content: 'Correction method: ' },
+  { type: 'field', id: 'correctionOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'correctionOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nOrbit, eye position, motility: ' },
+  { type: 'field', id: 'orbitOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'orbitOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nEyelids: ' },
+  { type: 'field', id: 'eyelidsOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'eyelidsOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nCiliary margin: ' },
+  { type: 'field', id: 'ciliaryOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'ciliaryOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nConjunctiva: ' },
+  { type: 'field', id: 'conjunctivaOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'conjunctivaOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nDischarge: ' },
+  { type: 'field', id: 'dischargeOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'dischargeOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nLacrimal apparatus: ' },
+  { type: 'field', id: 'lacrimalOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'lacrimalOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nPatency: ' },
+  { type: 'field', id: 'patencyOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'patencyOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nSclera: ' },
+  { type: 'field', id: 'scleraOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'scleraOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nCornea: ' },
+  { type: 'field', id: 'corneaOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'corneaOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nAnterior chamber: ' },
+  { type: 'field', id: 'anteriorChamberOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'anteriorChamberOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nIris: ' },
+  { type: 'field', id: 'irisOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'irisOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nPupil: ' },
+  { type: 'field', id: 'pupilOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'pupilOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nLens: ' },
+  { type: 'field', id: 'lensOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'lensOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nVitreous body: ' },
+  { type: 'field', id: 'vitreousOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'vitreousOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nFundus: ' },
+  { type: 'field', id: 'fundusOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'fundusOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nVessels: ' },
+  { type: 'field', id: 'vesselsOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'vesselsOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nRetina: ' },
+  { type: 'field', id: 'retinaOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'retinaOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nVisual field: ' },
+  { type: 'field', id: 'visualFieldOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'visualFieldOs', placeholder: 'OS' },
+  { type: 'text', content: '.\nIOP: ' },
+  { type: 'field', id: 'iopOd', placeholder: 'OD' },
+  { type: 'text', content: ', ' },
+  { type: 'field', id: 'iopOs', placeholder: 'OS' },
+  { type: 'text', content: '.' },
+];
+
+/** Example tree-field values (full paths from leaf selection). */
+export const exampleTreeFieldValues = {
+  complaints: [
+    'Vision disturbance decreased acuity',
+    'Tearing',
+    'Redness',
+  ],
+  lifeAnamnesis: [
+    'Chronic conditions diabetes mellitus',
+    'Unremarkable',
+  ],
+};
+
+export function createOphthalmologyTemplate({ withExamples = true } = {}) {
+  const treeExamples = withExamples ? exampleTreeFieldValues : {};
+
+  return {
+    time: Date.now(),
+    fieldSchemas: { ...ophthalmologySchemas },
+    blocks: [
+      {
+        type: 'documentSection',
+        data: {
+          name: 'Anamnesis',
+          label: 'Anamnesis',
+          segments: [
+            { type: 'text', content: 'Complaints: ' },
+            { type: 'field', id: 'complaints', placeholder: 'Complaints' },
+            { type: 'text', content: '.\nLife history: ' },
+            { type: 'field', id: 'lifeAnamnesis', placeholder: 'Life history' },
+            { type: 'text', content: '.' },
+          ],
+          fieldValues: {
+            complaints: treeExamples.complaints ?? [],
+            lifeAnamnesis: treeExamples.lifeAnamnesis ?? [],
+          },
+        },
+      },
+      {
+        type: 'documentSection',
+        data: {
+          name: 'Visual acuity',
+          label: 'Visual acuity',
+          segments: [
+            {
+              type: 'table',
+              id: 'visionTable',
+              rows: [
+                { key: 'od', label: 'OD' },
+                { key: 'os', label: 'OS' },
+              ],
+            },
+          ],
+          fieldValues: {},
+        },
+      },
+      {
+        type: 'documentSection',
+        data: {
+          name: 'Examination',
+          label: 'Examination',
+          segments: examSegments,
+          fieldValues: {},
+        },
+      },
+      {
+        type: 'documentSection',
+        data: {
+          name: 'Diagnosis',
+          label: 'Diagnosis',
+          segments: [
+            { type: 'text', content: 'Diagnosis: ' },
+            { type: 'field', id: 'icd10', placeholder: 'ICD-10 list' },
+            { type: 'text', content: '.\nClinical diagnosis: ' },
+            { type: 'field', id: 'clinicalDiagnosis', placeholder: 'Clinical diagnosis' },
+            { type: 'text', content: '.' },
+          ],
+          fieldValues: {},
+        },
+      },
+    ],
+  };
+}

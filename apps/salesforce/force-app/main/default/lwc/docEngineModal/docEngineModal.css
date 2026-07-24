@@ -1,0 +1,75 @@
+.doc-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  /* Leave room for LightningModal header + footer + chrome */
+  height: calc(100vh - 20rem);
+  max-height: calc(100vh - 20rem);
+  overflow: hidden; /* no outer scroll — only .editor-root scrolls */
+}
+
+/* Fill mode: page format/orientation (+10%) from --doc-page-* set by the editor */
+.doc-shell.doc-shell--fill-page {
+  max-width: min(100%, calc(var(--doc-page-width, 231mm) + 4rem));
+  margin-inline: auto;
+}
+
+.doc-shell .editor-root.editor-holder--fill-page {
+  background: var(--lwc-colorBackground, #f3f3f3);
+  padding: 16px 12px 24px;
+  box-sizing: border-box;
+}
+
+.doc-shell .editor-holder--fill-page .codex-editor {
+  width: min(100%, var(--doc-page-width, 231mm));
+  max-width: var(--doc-page-width, 231mm);
+  min-height: var(--doc-page-min-height, 326.7mm);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  padding: var(--doc-page-margin, 16.5mm);
+  background: var(--lwc-colorBackgroundAlt, #fff);
+  border: 1px solid var(--lwc-colorBorder, #c9c9c9);
+  border-radius: 2px;
+  box-shadow: 0 4px 24px rgb(15 23 42 / 0.12);
+}
+
+.doc-shell .editor-holder--fill-page .codex-editor__redactor {
+  padding: 0 !important;
+}
+
+.waiting-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+}
+
+/* Format panel — pinned above the document */
+.chrome-row {
+  flex: 0 0 auto;
+}
+
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Document body — sole vertical scroller */
+.editor-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}

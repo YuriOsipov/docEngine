@@ -1,0 +1,16 @@
+{
+  "name": "pdf-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "start": "node dist/server.js",
+    "dev": "npm run build && node --watch dist/server.js",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@docengine/pdf-renderer": "1.0.0"
+  }
+}

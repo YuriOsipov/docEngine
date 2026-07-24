@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>DocEngine Template Builder</masterLabel>
+    <description>Design-mode editor for DocEngine_Template__c. Place on a DocEngine Template record page or an App Page.</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+        <target>lightning__Tab</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <objects>
+                <object>DocEngine_Template__c</object>
+            </objects>
+        </targetConfig>
+        <targetConfig targets="lightning__AppPage">
+            <property
+                name="defaultObjectApiName"
+                type="String"
+                label="Default Object API Name"
+                description="Pre-fill Object API Name for new templates (e.g. Account)."
+            />
+            <property
+                name="recordId"
+                type="String"
+                label="Template Id"
+                description="Optional existing DocEngine_Template__c Id to edit."
+            />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

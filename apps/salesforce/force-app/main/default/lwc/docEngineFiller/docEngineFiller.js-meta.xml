@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>DocEngine Document Filler</masterLabel>
+    <description>Fill-mode editor: pick a DocEngine_Template__c for the current record, merge Salesforce data, save DocEngine_Document__c.</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AppPage">
+            <property name="recordId" type="String" label="Record Id" description="Source Salesforce record Id." />
+            <property name="instanceId" type="String" label="DocEngine Document Id" description="Optional DocEngine_Document__c to reopen." />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

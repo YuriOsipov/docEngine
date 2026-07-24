@@ -1,0 +1,112 @@
+:host {
+  display: block;
+}
+
+.doc-editor-root {
+  --me-primary: var(--lwc-brandPrimary, #0176d3);
+  --me-primary-hover: var(--lwc-brandPrimaryActive, #014486);
+  --me-primary-contrast: #fff;
+  --me-primary-muted: var(--lwc-brandPrimaryActive, #014486);
+
+  --me-surface-0: var(--lwc-colorBackgroundAlt, #fff);
+  --me-surface-50: var(--lwc-colorBackground, #f3f3f3);
+  --me-surface-100: var(--lwc-colorBackgroundRowHover, #f3f3f3);
+  --me-surface-200: var(--lwc-colorBackgroundShade, #ecebea);
+  --me-surface-300: var(--lwc-colorBackgroundStencil, #ecebea);
+  --me-surface-muted: var(--lwc-colorBackgroundAlt, #fafafa);
+
+  --me-border: var(--lwc-colorBorder, #c9c9c9);
+  --me-border-strong: var(--lwc-colorBorderInput, #747474);
+  --me-border-input: var(--lwc-colorBorderInput, #747474);
+  --me-border-subtle: var(--lwc-colorBorderSeparator, #e5e5e5);
+
+  --me-text: var(--lwc-colorTextDefault, #181818);
+  --me-text-body: var(--lwc-colorTextDefault, #181818);
+  --me-text-muted: var(--lwc-colorTextLabel, #444);
+  --me-text-subtle: var(--lwc-colorTextWeak, #706e6b);
+  --me-text-placeholder: var(--lwc-colorTextInputDisabled, #747474);
+
+  --me-focus-color: var(--lwc-brandPrimary, #0176d3);
+  --me-selection-outline: var(--lwc-brandPrimary, #0176d3);
+  --me-drop-indicator: var(--lwc-brandPrimary, #0176d3);
+
+  --me-font-family: var(--lwc-fontFamily, 'Salesforce Sans', Arial, sans-serif);
+  --me-radius-sm: var(--lwc-borderRadiusMedium, 0.25rem);
+  --me-radius-md: var(--lwc-borderRadiusMedium, 0.25rem);
+}
+
+.sticky-chrome {
+  --me-surface-300: var(--lwc-colorBackgroundShade, #ecebea);
+}
+
+.doc-actions {
+  min-height: 2rem;
+}
+
+.editor-root {
+  min-height: 480px;
+}
+
+/* When panels layout wraps the holder, keep fill mode from collapsing in Lightning cards */
+:host .design-shell:not(.design-shell--active),
+.doc-editor-host .design-shell:not(.design-shell--active) {
+  min-height: 480px;
+}
+
+.toolbar-row {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.filling-toggle {
+  min-width: 8.5rem;
+}
+
+.io-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--lwc-colorBorder, #c9c9c9);
+  border-radius: var(--lwc-borderRadiusMedium, 0.25rem);
+  background: var(--lwc-colorBackgroundAlt, #fff);
+}
+
+.io-group__label {
+  font-size: 0.75rem;
+  color: var(--lwc-colorTextWeak, #706e6b);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+
+.file-input {
+  display: none;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  align-items: end;
+}
+
+@media (max-width: 64rem) {
+  .meta-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .meta-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

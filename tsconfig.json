@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/field-date" },
+    { "path": "./packages/engine" },
+    { "path": "./packages/pdf-renderer" },
+    { "path": "./packages/editor" },
+    { "path": "./apps/pdf-service" },
+    { "path": "./apps/n8n-nodes-docengine" }
+  ]
+}

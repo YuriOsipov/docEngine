@@ -1,0 +1,35 @@
+{
+  "name": "@docengine/pdf-renderer",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@docengine/editor": "1.0.0",
+    "dejavu-fonts-ttf": "^2.37.3",
+    "linkedom": "^0.18.12",
+    "pdfmake": "^0.2.20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:vfs": "node scripts/build-browser-vfs.mjs",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test dist/**/*.test.js"
+  }
+}

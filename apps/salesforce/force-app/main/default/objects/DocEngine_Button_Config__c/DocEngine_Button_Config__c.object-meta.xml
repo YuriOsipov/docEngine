@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Record-button presets for DocEngine (template lookup, fill, export, preview). Replaces DocEngine_Button__mdt.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>DocEngine Button Config</label>
+    <nameField>
+        <label>Config Label</label>
+        <length>80</length>
+        <type>Text</type>
+    </nameField>
+    <pluralLabel>DocEngine Button Configs</pluralLabel>
+    <searchLayouts>
+        <searchResultsAdditionalFields>Developer_Name__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Template__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Fill_Mode__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Export_Mode__c</searchResultsAdditionalFields>
+    </searchLayouts>
+    <sharingModel>ReadWrite</sharingModel>
+</CustomObject>

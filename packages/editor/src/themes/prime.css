@@ -1,0 +1,111 @@
+/**
+ * PrimeVue 4 theme adapter for @docengine/editor.
+ *
+ * Requires PrimeVue styled mode (design tokens / --p-* CSS variables).
+ * Import after styles.css and bridge.css:
+ *
+ *   import '@docengine/editor/styles.css';
+ *   import '@docengine/editor/themes/bridge.css';
+ *   import '@docengine/editor/themes/prime.css';
+ *
+ * Recommended PrimeVue setup (main.js):
+ *
+ *   app.use(PrimeVue, {
+ *     theme: {
+ *       preset: Aura,
+ *       options: {
+ *         cssLayer: {
+ *           name: 'primevue',
+ *           order: 'reset, primevue, doc-editor, app',
+ *         },
+ *       },
+ *     },
+ *   });
+ *
+ * Then wrap bridge + prime imports in @layer doc-editor { ... } in your
+ * app entry, or import them after PrimeVue so overrides apply correctly.
+ */
+
+:root {
+  /* Brand */
+  --me-primary: var(--p-primary-color, #4a7ab5);
+  --me-primary-hover: var(--p-primary-hover-color, #3a6a9f);
+  --me-primary-contrast: var(--p-primary-contrast-color, #fff);
+  --me-primary-muted: var(--p-primary-600, #2a5a9e);
+
+  /* Surfaces */
+  --me-surface-0: var(--p-content-background, #fff);
+  --me-surface-50: var(--p-surface-50, #f8f8f8);
+  --me-surface-100: var(--p-surface-100, #f4f4f4);
+  --me-surface-200: var(--p-surface-200, #f0f0f0);
+  --me-surface-300: var(--p-surface-300, #e8e8e8);
+  --me-surface-muted: var(--p-surface-50, #fafafa);
+
+  /* Borders */
+  --me-border: var(--p-content-border-color, #ccc);
+  --me-border-strong: var(--p-form-field-border-color, #999);
+  --me-border-input: var(--p-inputtext-border-color, #aaa);
+  --me-border-subtle: var(--p-surface-200, #ddd);
+
+  /* Text */
+  --me-text: var(--p-text-color, #1a1a1a);
+  --me-text-body: var(--p-text-color, #333);
+  --me-text-muted: var(--p-text-muted-color, #555);
+  --me-text-subtle: var(--p-text-muted-color, #666);
+  --me-text-placeholder: var(--p-text-muted-color, #888);
+
+  /* Accent panels */
+  --me-accent-surface: var(--p-primary-50, #e8f0fa);
+  --me-accent-border: var(--p-primary-200, #9ab);
+  --me-accent-hover: var(--p-primary-50, #f0f8ff);
+  --me-accent-hover-border: var(--p-primary-300, #7a9);
+  --me-accent-panel: var(--p-surface-100, #e4eaf2);
+
+  /* Focus / selection */
+  --me-focus-color: var(--p-primary-color, #4a7ab5);
+  --me-focus-ring: var(--p-focus-ring-shadow, 0 0 0 2px color-mix(in srgb, var(--p-primary-color) 35%, transparent));
+  --me-selection-outline: var(--p-primary-color, #2563eb);
+  --me-selection-bg: var(--p-primary-50, #eff6ff);
+  --me-drop-indicator: var(--p-primary-color, #2563eb);
+
+  /* Semantic */
+  --me-danger: var(--p-red-500, #c44);
+  --me-danger-strong: var(--p-red-600, #b00020);
+  --me-danger-bg: var(--p-red-50, #fee);
+  --me-danger-surface: var(--p-red-50, #fff3f3);
+  --me-danger-border: var(--p-red-200, #e0a0a0);
+  --me-warning: var(--p-yellow-500, #e6a800);
+  --me-warning-bg: var(--p-yellow-50, #fff3cd);
+  --me-warning-outline: var(--p-yellow-600, #c9a227);
+
+  /* Typography */
+  --me-font-family: var(--p-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+  --me-font-size: var(--p-form-field-font-size, 13px);
+  --me-font-size-sm: var(--p-form-field-sm-font-size, 12px);
+  --me-font-size-xs: 11px;
+
+  /* Layout */
+  --me-radius-sm: var(--p-form-field-border-radius, 3px);
+  --me-radius-md: var(--p-content-border-radius, 4px);
+  --me-overlay-z-index: var(--p-overlay-modal-z-index, 1100);
+  --me-shadow-modal: var(--p-overlay-modal-shadow, 0 8px 32px rgba(0, 0, 0, 0.25));
+  --me-shadow-sticky: var(--p-overlay-popover-shadow, 0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+/* Prime-aligned button styling inside editor UI */
+.btn {
+  border-color: var(--p-button-secondary-border-color, var(--me-border-strong));
+  background: var(--p-button-secondary-background, var(--me-surface-200));
+  color: var(--p-button-secondary-color, var(--me-text-body));
+}
+
+.btn-primary {
+  background: var(--p-button-primary-background, var(--me-primary));
+  border-color: var(--p-button-primary-border-color, var(--me-primary-hover));
+  color: var(--p-button-primary-color, var(--me-primary-contrast));
+}
+
+.btn-primary:hover {
+  background: var(--p-button-primary-hover-background, var(--me-primary-hover));
+  border-color: var(--p-button-primary-hover-border-color, var(--me-primary-hover));
+}

@@ -1,0 +1,318 @@
+const MIN_COLUMN_WIDTH_PX = 40;
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} [max]
+ * @returns {number}
+ */
+export function clampColumnWidthPx(value: any, min: any = MIN_COLUMN_WIDTH_PX, max: any = Infinity) {
+  if (!Number.isFinite(value)) return min;
+  const upper = Number.isFinite(max) ? max : Infinity;
+  return Math.min(upper, Math.max(min, Math.round(value)));
+}
+
+/**
+ * @param {HTMLTableElement | null | undefined} tableEl
+ * @returns {HTMLTableColElement[]}
+ */
+export function getTableDataColElements(tableEl: any) {
+  if (!tableEl) return [];
+  let cols = [...(tableEl.querySelectorAll(':scope > colgroup > col') ?? [])];
+  // Drop the leading row-label column when present.
+  if (tableEl.querySelector(':scope > thead th.vision-table__row-label-head') ||
+      tableEl.querySelector(':scope > tbody > tr > td.vision-table__row-label')) {
+    cols = cols.slice(1);
+  }
+  // Drop the trailing row-actions column when present.
+  const actionsHead = tableEl.querySelector(':scope > thead th.vision-table__actions-head');
+  if (actionsHead && cols.length > 0) return cols.slice(0, -1);
+  const actionsCell = tableEl.querySelector(
+    ':scope > tbody > tr > td.vision-table__row-actions',
+  );
+  if (actionsCell && cols.length > 0) return cols.slice(0, -1);
+  return cols;
+}
+
+/**
+ * Apply a live pixel width to a `<col>` during drag.
+ * @param {HTMLTableColElement | null | undefined} colEl
+ * @param {number} widthPx
+ */
+export function applyColElementWidthPx(colEl: any, widthPx: any) {
+  if (!colEl) return;
+  const width = `${clampColumnWidthPx(widthPx)}px`;
+  colEl.style.width = width;
+  colEl.style.minWidth = width;
+  colEl.style.maxWidth = width;
+}
+
+/**
+ * Apply a percent width to a `<col>`.
+ * @param {HTMLTableColElement | null | undefined} colEl
+ * @param {number} percent
+ */
+export function applyColElementWidthPercent(colEl: any, percent: any) {
+  if (!colEl || !Number.isFinite(percent)) return;
+  const rounded = Math.round(percent * 10) / 10;
+  const width = `${rounded}%`;
+  colEl.style.width = width;
+  colEl.style.minWidth = width;
+  colEl.style.maxWidth = width;
+}
+
+/**
+ * Read current rendered widths for data columns.
+ * @param {HTMLTableElement} tableEl
+ * @param {{ preferLayout?: boolean }} [options]
+ * @returns {number[]}
+ */
+export function measureTableColumnWidthsPx(tableEl: any, options: any = {}) {
+  const preferLayout = !!options.preferLayout;
+  return getTableDataColElements(tableEl).map((colEl: any) => {
+    if (!preferLayout) {
+      const raw = String(colEl.style.width ?? '').trim();
+      if (/^\d+(\.\d+)?px$/i.test(raw)) {
+        const styleWidth = Number.parseFloat(raw);
+        if (Number.isFinite(styleWidth) && styleWidth > 0) return styleWidth;
+      }
+    }
+    const rect = colEl.getBoundingClientRect?.();
+    if (rect?.width > 0) return rect.width;
+    return MIN_COLUMN_WIDTH_PX;
+  });
+}
+
+/**
+ * @param {HTMLTableElement} tableEl
+ * @returns {number}
+ */
+export function measureTableWidthPx(tableEl: any) {
+  const rect = tableEl?.getBoundingClientRect?.();
+  if (rect?.width > 0) return rect.width;
+  const sum = measureTableColumnWidthsPx(tableEl, { preferLayout: true })
+    .reduce((total: any, w: any) => total + w, 0);
+  return sum > 0 ? sum : 1;
+}
+
+/**
+ * Convert absolute pixel widths to percentages of the table width.
+ * `%` on `<col>` is relative to the full table (including row-actions), so the
+ * denominator must be the table width — not only the sum of data columns.
+ *
+ * @param {number[]} widthsPx
+ * @param {number} tableWidthPx
+ * @returns {Array<number | null>}
+ */
+export function widthsPxToPercents(widthsPx: any, tableWidthPx: any) {
+  const tableWidth = Number(tableWidthPx);
+  if (Number.isFinite(tableWidth) && tableWidth > 0) {
+    return (widthsPx ?? []).map((w: any) => {
+      if (!Number.isFinite(w) || w <= 0) return null;
+      return Math.round(((w / tableWidth) * 100) * 10) / 10;
+    });
+  }
+
+  // Fallback when table width is unknown: normalize data columns to 100%.
+  const total = (widthsPx ?? []).reduce(
+    (sum: any, w: any) => sum + (Number.isFinite(w) && w > 0 ? w : 0),
+    0,
+  );
+  if (total <= 0) return (widthsPx ?? []).map((): any => null);
+  return widthsPx.map((w: any) => {
+    if (!Number.isFinite(w) || w <= 0) return null;
+    return Math.round(((w / total) * 100) * 10) / 10;
+  });
+}
+
+/**
+ * Build updated column defs with percent widths from measured pixel sizes.
+ * @param {Array<{ key: string, label?: string, name?: string, width?: string }>} columns
+ * @param {number[]} widthsPx
+ * @param {number} [tableWidthPx]
+ */
+export function applyPercentWidthsToColumns(columns: any, widthsPx: any, tableWidthPx: any) {
+  const percents = widthsPxToPercents(widthsPx, tableWidthPx);
+  return (columns ?? []).map((col: any, index: any) => {
+    const pct = percents[index];
+    if (pct == null) return { ...col };
+    return { ...col, width: `${pct}%` };
+  });
+}
+
+/**
+ * @deprecated Prefer applyPercentWidthsToColumns.
+ */
+export function applyPixelWidthsToColumns(columns: any, widthsPx: any, tableWidthPx: any) {
+  return applyPercentWidthsToColumns(columns, widthsPx, tableWidthPx);
+}
+
+/**
+ * Redistribute width between a column and its right-hand neighbor so the pair
+ * total stays constant (classic splitter behavior).
+ *
+ * @param {number[]} startWidths
+ * @param {number} colIndex
+ * @param {number} deltaPx
+ * @param {number} [minWidthPx]
+ * @returns {number[]}
+ */
+export function redistributeAdjacentWidths(
+  startWidths: any,
+  colIndex: any,
+  deltaPx: any,
+  minWidthPx: any = MIN_COLUMN_WIDTH_PX,
+) {
+  const widths = [...(startWidths ?? [])];
+  const count = widths.length;
+  if (count === 0 || colIndex < 0 || colIndex >= count) return widths;
+
+  const neighborIndex = colIndex < count - 1 ? colIndex + 1 : colIndex - 1;
+  if (neighborIndex < 0) {
+    widths[colIndex] = clampColumnWidthPx(widths[colIndex] + deltaPx, minWidthPx);
+    return widths;
+  }
+
+  const leftIndex = Math.min(colIndex, neighborIndex);
+  const rightIndex = Math.max(colIndex, neighborIndex);
+  // Dragging the right edge of `colIndex` grows that column when delta > 0.
+  const signedDelta = colIndex <= neighborIndex ? deltaPx : -deltaPx;
+  const pairTotal = widths[leftIndex] + widths[rightIndex];
+  const nextLeft = clampColumnWidthPx(
+    widths[leftIndex] + signedDelta,
+    minWidthPx,
+    pairTotal - minWidthPx,
+  );
+  widths[leftIndex] = nextLeft;
+  widths[rightIndex] = pairTotal - nextLeft;
+  return widths;
+}
+
+/**
+ * Swallow the synthetic `click` that follows a drag so the editor chrome does
+ * not treat it as a canvas click (which clears selection / opens Page setup).
+ */
+function suppressNextDocumentClick() {
+  const suppress = (event: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.removeEventListener('click', suppress, true);
+  };
+  document.addEventListener('click', suppress, true);
+  setTimeout(() => {
+    document.removeEventListener('click', suppress, true);
+  }, 0);
+}
+
+/**
+ * Wire drag-to-resize handles on a vision-table (design mode).
+ * Handles are `.vision-table__col-resizer[data-col-index]`.
+ *
+ * Drag uses px for smooth feedback; widths are persisted as % of the table.
+ *
+ * @param {HTMLTableElement | null | undefined} tableEl
+ * @param {{
+ *   tableId?: string,
+ *   getRegistry?: () => { getFieldSchemas?: () => Record<string, any>, updateFieldSchema?: Function },
+ *   onSchemaChange?: (schemas: Record<string, any>) => void,
+ *   onTableColumnWidthsChange?: (tableId: string, columns: Array<object>) => void,
+ *   minWidthPx?: number,
+ * }} [options]
+ */
+export function wireTableColumnResize(tableEl: any, options: any = {}) {
+  if (!tableEl?.querySelectorAll) return;
+  if (tableEl.dataset.colResizeWired === 'true') return;
+
+  const handles = [...tableEl.querySelectorAll('.vision-table__col-resizer')];
+  if (!handles.length) return;
+
+  tableEl.dataset.colResizeWired = 'true';
+  const minWidthPx = options.minWidthPx ?? MIN_COLUMN_WIDTH_PX;
+
+  handles.forEach((handle: any) => {
+    handle.addEventListener('mousedown', (event: any) => {
+      if (event.button != null && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const colIndex = Number(handle.dataset.colIndex);
+      if (!Number.isInteger(colIndex) || colIndex < 0) return;
+
+      const colEls = getTableDataColElements(tableEl);
+      if (!colEls[colIndex]) return;
+
+      const startX = Number(event.clientX) || 0;
+      const tableWidthPx = measureTableWidthPx(tableEl);
+      const measured = measureTableColumnWidthsPx(tableEl, { preferLayout: true });
+      /** @type {number[]} */
+      let liveWidths = [...measured];
+      let didDrag = false;
+
+      handle.classList.add('vision-table__col-resizer--active');
+      tableEl.classList.add('vision-table--resizing');
+      document.body.classList.add('vision-table-col-resize-active');
+
+      function applyLiveWidths() {
+        liveWidths.forEach((widthPx: any, index: any) => {
+          applyColElementWidthPx(colEls[index], widthPx);
+        });
+      }
+
+      function onMove(moveEvent: any) {
+        const clientX = Number(moveEvent.clientX) || 0;
+        if (Math.abs(clientX - startX) > 2) didDrag = true;
+        liveWidths = redistributeAdjacentWidths(
+          measured,
+          colIndex,
+          clientX - startX,
+          minWidthPx,
+        );
+        applyLiveWidths();
+      }
+
+      function onUp(upEvent: any) {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        handle.classList.remove('vision-table__col-resizer--active');
+        tableEl.classList.remove('vision-table--resizing');
+        document.body.classList.remove('vision-table-col-resize-active');
+
+        upEvent?.preventDefault?.();
+        upEvent?.stopPropagation?.();
+        if (didDrag) suppressNextDocumentClick();
+
+        const tableId = options.tableId ?? tableEl.closest?.('.document-table')?.dataset?.tableId;
+        if (!tableId) return;
+
+        const registry = options.getRegistry?.();
+        const schemas = registry?.getFieldSchemas?.() ?? {};
+        const schema = schemas[tableId];
+        if (!schema || schema.type !== 'table') return;
+
+        // Prefer the last live px widths (stable); fall back to layout if needed.
+        const finalPx = liveWidths.some((w: any) => Number.isFinite(w) && w > 0)
+          ? liveWidths
+          : measureTableColumnWidthsPx(tableEl, { preferLayout: true });
+        const percents = widthsPxToPercents(finalPx, tableWidthPx);
+        percents.forEach((pct: any, index: any) => {
+          if (pct == null) return;
+          applyColElementWidthPercent(colEls[index], pct);
+        });
+
+        const columns = applyPercentWidthsToColumns(
+          schema.columns ?? [],
+          finalPx,
+          tableWidthPx,
+        );
+        registry.updateFieldSchema?.(tableId, { ...schema, columns });
+        options.onTableColumnWidthsChange?.(tableId, columns);
+        options.onSchemaChange?.(registry.getFieldSchemas?.() ?? schemas);
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
+export { MIN_COLUMN_WIDTH_PX };

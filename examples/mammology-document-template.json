@@ -1,0 +1,211 @@
+{
+  "kind": "template",
+  "version": 1,
+  "time": 1782202748519,
+  "fieldSchemas": {
+    "statusLocalis": {
+      "type": "tree",
+      "name": "ST.LOCALIS",
+      "label": "ST.LOCALIS",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "tree": [
+        {
+          "label": "Права грудна залоза",
+          "children": [
+            { "label": "тканина однорідна" },
+            { "label": "бугристі структури різної величини" },
+            { "label": "набряк в зовнішніх квадрантах" },
+            { "label": "дольчата" }
+          ]
+        },
+        {
+          "label": "Ліва грудна залоза",
+          "children": [
+            { "label": "тканина однорідна" },
+            { "label": "бугристі структури різної величини" },
+            { "label": "набряк в зовнішніх квадрантах" },
+            { "label": "дольчата" }
+          ]
+        },
+        { "label": "Без особливостей" }
+      ]
+    },
+    "focalPalpation": {
+      "type": "tree",
+      "name": "Focal palpation",
+      "label": "Вогнещевої патології пальпаторно",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "tree": [
+        { "label": "Патологія не виявлена" },
+        {
+          "label": "Утворення",
+          "children": [
+            {
+              "label": "права грудна залоза",
+              "children": [
+                { "label": "внутрішні квадранти" },
+                { "label": "зовнішні квадранти" },
+                { "label": "на межі внутрішніх квадрантів" }
+              ]
+            },
+            {
+              "label": "ліва грудна залоза",
+              "children": [
+                { "label": "внутрішні квадранти" },
+                { "label": "зовнішні квадранти" },
+                { "label": "на межі внутрішніх квадрантів" }
+              ]
+            },
+            { "label": "чіткі межі" },
+            { "label": "нечіткі межі" },
+            { "label": "рухоме" },
+            { "label": "нерухоме" },
+            { "label": "до 1 см" },
+            { "label": "1-2 см" },
+            { "label": "більше 2 см" }
+          ]
+        }
+      ]
+    },
+    "nippleDischarge": {
+      "type": "choice",
+      "name": "Nipple discharge",
+      "label": "Виділення із сосків",
+      "allowManualEdit": true,
+      "multi": false,
+      "defaultValue": "",
+      "items": [
+        { "id": "nd-none", "label": "не має" },
+        { "id": "nd-serous", "label": "серозні" },
+        { "id": "nd-bloody", "label": "кров'янисті" },
+        { "id": "nd-purulent", "label": "гнійні" },
+        { "id": "nd-milky", "label": "молочні" },
+        { "id": "nd-one-duct", "label": "з однієї молочної протоки" },
+        { "id": "nd-both", "label": "з обох сосків" }
+      ]
+    },
+    "regionalLymphNodes": {
+      "type": "choice",
+      "name": "Regional lymph nodes",
+      "label": "Регіонарні лімфатичні вузли",
+      "allowManualEdit": true,
+      "multi": false,
+      "defaultValue": "",
+      "items": [
+        { "id": "ln-not-enlarged", "label": "не збільшені" },
+        { "id": "ln-enlarged", "label": "збільшені" },
+        { "id": "ln-painful", "label": "болючі" },
+        { "id": "ln-dense", "label": "щільні" },
+        { "id": "ln-not-palpable", "label": "не пальпуються" }
+      ]
+    },
+    "skinChanges": {
+      "type": "list",
+      "name": "Skin changes",
+      "label": "Зміни зі сторони шкіри",
+      "allowManualEdit": true,
+      "multi": true,
+      "itemLayout": "inline",
+      "defaultValue": [],
+      "items": [
+        { "id": "sc-none", "label": "не має" },
+        { "id": "sc-redness", "label": "почервоніння" },
+        { "id": "sc-edema", "label": "набряк" },
+        { "id": "sc-retraction", "label": "втягнення шкіри" },
+        { "id": "sc-orange-peel", "label": "пітінг-апельсинова шкірка" },
+        { "id": "sc-ulcer", "label": "виразка" },
+        { "id": "sc-nipple-hyperemia", "label": "гіперемія соска" },
+        { "id": "sc-thickening", "label": "потовщення шкіри" }
+      ]
+    },
+    "diagnosis": {
+      "type": "list",
+      "name": "Diagnosis",
+      "label": "ДІАГНОЗ",
+      "allowManualEdit": true,
+      "multi": true,
+      "itemLayout": "lines",
+      "defaultValue": [],
+      "displayStyle": {
+        "fontWeight": "bold"
+      },
+      "items": [
+        { "id": "dx-us-done", "label": "УЗД грудних залоз виконано" },
+        { "id": "dx-us-normal", "label": "УЗД без патології" },
+        { "id": "dx-cysts-right", "label": "Поодинокі кісти правої грудної залози" },
+        { "id": "dx-cysts-left", "label": "Поодинокі кісти лівої грудної залози" },
+        { "id": "dx-complex-cyst-right", "label": "Складна кіста правої грудної залози" },
+        { "id": "dx-complex-cyst-left", "label": "Складна кіста лівої грудної залози" },
+        { "id": "dx-inflamed-cyst-right", "label": "Кіста з ознаками запалення правої грудної залози" },
+        { "id": "dx-inflamed-cyst-left", "label": "Кіста з ознаками запалення лівої грудної залози" },
+        { "id": "dx-simple-cyst-right", "label": "Проста кіста правої грудної залози" },
+        { "id": "dx-simple-cyst-left", "label": "Проста кіста лівої грудної залози" },
+        { "id": "dx-mastopathy", "label": "Мастопатія" },
+        { "id": "dx-fibroadenoma", "label": "Фіброаденома" },
+        { "id": "dx-fcm", "label": "Фіброзно-кистозна мастопатія" },
+        { "id": "dx-papilloma", "label": "Внутріпротокова папілома" },
+        { "id": "dx-fat-necrosis", "label": "Жировий некроз" },
+        { "id": "dx-granulomatous", "label": "Гангріонарний мастит" },
+        { "id": "dx-suspicious", "label": "Підозра на злоякісне утворення" },
+        { "id": "dx-invasive-cancer", "label": "Інвазивний рак грудної залози" }
+      ]
+    },
+    "recommended": {
+      "type": "list",
+      "name": "Recommended",
+      "label": "Рекомендовано",
+      "allowManualEdit": true,
+      "multi": true,
+      "itemLayout": "lines",
+      "defaultValue": [],
+      "items": [
+        { "id": "rec-mammologist", "label": "Огляд мамолога" },
+        { "id": "rec-us-3-6", "label": "УЗД грудних залоз через 3-6 міс" },
+        { "id": "rec-us-12", "label": "УЗД грудних залоз через 12 міс" },
+        { "id": "rec-mammography", "label": "Мамографія" },
+        { "id": "rec-mri", "label": "МРТ грудних залоз" },
+        { "id": "rec-fna", "label": "Тонкоголкова аспіраційна біопсія" },
+        { "id": "rec-core-biopsy", "label": "Кор-біопсія" },
+        { "id": "rec-oncologist", "label": "Консультація онколога" },
+        { "id": "rec-observation", "label": "Динамічне спостереження" }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "MammologyExam",
+        "label": "Огляд",
+        "segments": [
+          { "type": "text", "content": "ST.LOCALIS: " },
+          { "type": "field", "id": "statusLocalis", "placeholder": "ST.LOCALIS" },
+          { "type": "text", "content": ".\nВогнещевої патології пальпаторно: " },
+          { "type": "field", "id": "focalPalpation", "placeholder": "Вогнещевої патології пальпаторно" },
+          { "type": "text", "content": ".\nВиділення із сосків: " },
+          { "type": "field", "id": "nippleDischarge", "placeholder": "Виділення із сосків" },
+          { "type": "text", "content": ".\nРегіонарні лімфатичні вузли: " },
+          { "type": "field", "id": "regionalLymphNodes", "placeholder": "Регіонарні лімфатичні вузли" },
+          { "type": "text", "content": ".\nЗміни зі сторони шкіри: " },
+          { "type": "field", "id": "skinChanges", "placeholder": "Зміни зі сторони шкіри" },
+          { "type": "text", "content": ".\nДІАГНОЗ: " },
+          { "type": "field", "id": "diagnosis", "placeholder": "ДІАГНОЗ" },
+          { "type": "text", "content": ".\nРекомендовано: " },
+          { "type": "field", "id": "recommended", "placeholder": "Рекомендовано" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "statusLocalis": [],
+          "focalPalpation": [],
+          "nippleDischarge": "",
+          "regionalLymphNodes": "",
+          "skinChanges": [],
+          "diagnosis": [],
+          "recommended": []
+        }
+      }
+    }
+  ]
+}
