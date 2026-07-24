@@ -39,14 +39,38 @@ Read-only preview with optional PDF export from the same document model.
 
 ## Architecture
 
+`@docengine/engine` is the headless core. The editor and PDF renderer sit on top of it; apps and integrations host those packages (Salesforce loads a built static resource, not the npm package at runtime).
+
 ```mermaid
-flowchart LR
-  Editor["@docengine/editor"] --> Engine["@docengine/engine"]
-  Engine --> PDF["@docengine/pdf-renderer"]
-  PDF --> PdfSvc["pdf-service"]
-  Editor --> SF["Salesforce LWCs"]
-  Engine --> N8N["n8n node"]
-  PDF --> N8N
+flowchart TB
+  subgraph packages [Packages]
+    Engine["@docengine/engine<br/>schemas · mapping · I/O"]
+    Editor["@docengine/editor<br/>template UI"]
+    PDF["@docengine/pdf-renderer<br/>HTML / PDF export"]
+    Date["@docengine/field-date<br/>date field plugin"]
+  end
+
+  subgraph hosts [Hosts / integrations]
+    Demos["Vite demos"]
+    SF["Salesforce<br/>DocEngineBundle + LWCs"]
+    PdfSvc["pdf-service"]
+    N8N["n8n node"]
+    SfPdf["Salesforce PDF package<br/>Named Credential callout"]
+  end
+
+  Editor --> Engine
+  Editor --> PDF
+  PDF --> Engine
+  Date --> Engine
+  Date -.->|registers into| Editor
+
+  Demos --> Editor
+  Demos --> Date
+  SF --> Editor
+  PdfSvc --> PDF
+  N8N --> Engine
+  N8N --> PDF
+  SfPdf --> PdfSvc
 ```
 
 ## Repository layout
