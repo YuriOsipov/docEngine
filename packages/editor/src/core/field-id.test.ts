@@ -12,6 +12,7 @@ import {
   resolveSectionName,
   slugSectionKey,
   isFieldNameTakenInSection,
+  allocateUniqueSectionName,
 } from './field-id.js';
 import { applyFieldIdChange } from './field-schemas.js';
 
@@ -22,6 +23,24 @@ describe('resolveSectionName', () => {
 
   it('falls back to label when name is missing', () => {
     assert.equal(resolveSectionName({ label: 'Examination' }), 'Examination');
+  });
+
+  it('defaults empty name/label to Untitled', () => {
+    assert.equal(resolveSectionName({}), 'Untitled');
+    assert.equal(resolveSectionName({ name: '', label: '' }), 'Untitled');
+  });
+});
+
+describe('allocateUniqueSectionName', () => {
+  it('returns base when unused', () => {
+    assert.equal(allocateUniqueSectionName(new Set()), 'Untitled');
+  });
+
+  it('suffixes when Untitled is taken', () => {
+    const used = new Set(['Untitled']);
+    assert.equal(allocateUniqueSectionName(used), 'Untitled_2');
+    used.add('Untitled_2');
+    assert.equal(allocateUniqueSectionName(used), 'Untitled_3');
   });
 });
 

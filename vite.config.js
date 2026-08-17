@@ -29,12 +29,12 @@ export default defineConfig({
         replacement: path.resolve(__dirname, 'packages/editor/src/node.ts'),
       },
       {
-        find: '@docengine/editor',
-        replacement: path.resolve(__dirname, 'packages/editor/src/index.ts'),
-      },
-      {
         find: /^@docengine\/editor\/(.*)/,
         replacement: `${path.resolve(__dirname, 'packages/editor/src')}/$1`,
+      },
+      {
+        find: '@docengine/editor',
+        replacement: path.resolve(__dirname, 'packages/editor/src/index.ts'),
       },
     ],
   },

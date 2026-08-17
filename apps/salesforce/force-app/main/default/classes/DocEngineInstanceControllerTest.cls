@@ -438,4 +438,77 @@ private class DocEngineInstanceControllerTest {
     DocEngineInstanceController.PdfSaveResult result = DocEngineInstanceController.savePdf(inst.Id, b64, 'x');
     System.assertNotEquals(null, result.contentDocumentId);
   }
+
+  @IsTest
+  static void uploadFieldImageReturnsUrl() {
+    Account a = new Account(Name = 'Acme');
+    insert a;
+    // 1x1 PNG
+    String png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+    Test.startTest();
+    DocEngineInstanceController.ImageUploadResult result = DocEngineInstanceController.uploadFieldImage(
+      a.Id,
+      png,
+      'logo.png'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(null, result.contentVersionId);
+    System.assertNotEquals(null, result.contentDocumentId);
+    System.assert(String.isNotBlank(result.url), 'Expected image URL');
+  }
+
+  @IsTest
+  static void listAndResolveRecordImages() {
+    Account a = new Account(Name = 'Acme');
+    insert a;
+    String png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+    DocEngineInstanceController.ImageUploadResult uploaded = DocEngineInstanceController.uploadFieldImage(
+      a.Id,
+      png,
+      'logo.png'
+    );
+
+    Test.startTest();
+    List<DocEngineInstanceController.RecordImageItem> items = DocEngineInstanceController.listRecordImages(
+      a.Id
+    );
+    DocEngineInstanceController.ImageUploadResult resolved = DocEngineInstanceController.resolveFieldImage(
+      String.valueOf(uploaded.contentVersionId)
+    );
+    Test.stopTest();
+
+    System.assertEquals(1, items.size());
+    System.assertEquals(uploaded.contentVersionId, items[0].contentVersionId);
+    System.assertEquals('png', items[0].fileExtension);
+    System.assertNotEquals(null, resolved.contentVersionId);
+    System.assert(String.isNotBlank(resolved.url), 'Expected resolved image URL');
+  }
+
+  @IsTest
+  static void saveInstanceRejectsOversizedJson() {
+    DocEngine_Template__c t = makeTemplate();
+    Account a = new Account(Name = 'Acme');
+    insert a;
+
+    DocEngineInstanceController.InstanceDTO dto = new DocEngineInstanceController.InstanceDTO();
+    dto.templateId = t.Id;
+    dto.recordId = a.Id;
+    dto.objectApiName = 'Account';
+    dto.documentJson = '{"x":"' + 'a'.repeat(131070) + '"}';
+    dto.status = 'Draft';
+
+    Boolean threw = false;
+    try {
+      DocEngineInstanceController.saveInstance(dto);
+    } catch (AuraHandledException e) {
+      // AuraHandledException.getMessage() is often "Script-thrown exception" in tests.
+      threw = true;
+    }
+    System.assert(threw, 'Expected oversized documentJson to fail');
+  }
 }

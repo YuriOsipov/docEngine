@@ -18,10 +18,9 @@ import {
   createFieldToken,
   updateFieldToken,
   readTokenValue,
-  openFieldPicker,
+  pickFillFieldFromToken,
     isFieldEmpty,
   isTableCellDisplayPlaceholder,
-  findLiveFieldToken,
   resolveValueOrFillDefault,
 } from './inline-fields.js';
 import { createInlineRepeaterSeedValue } from './repeater-field.js';
@@ -240,30 +239,24 @@ function attachFillCellToken(token: any, fieldId: any, colLabel: any, options: a
     const schema = options.getRegistry?.()?.getFieldSchemas?.()?.[fieldId]
       ?? options.fieldSchemas?.[fieldId];
     if (!isFieldEditableInFillMode(schema)) return;
-    token.classList.add('field-token--active');
-    try {
-      const next = await openFieldPicker(fieldId, readTokenValue(token), options);
-      // Prefer the live token — schema updates during open can reinit the editor
-      // and detach the original element.
-      const live =
-        findLiveFieldToken(fieldId, options.editorHolder) ??
-        (token.isConnected ? token : null);
-      if (!live) {
-        onCellValueChange?.(fieldId, next);
-        return;
-      }
-      live.classList.remove('field-token--active');
-      updateFieldToken(live, next, colLabel, {
-        ...cellContext,
-        fieldSchemas:
-          options.getRegistry?.()?.getFieldSchemas?.() ?? cellContext.fieldSchemas,
-      });
-      onCellValueChange?.(fieldId, next);
-    } catch {
-      /* cancelled */
-    } finally {
-      token.classList.remove('field-token--active');
-    }
+
+    await pickFillFieldFromToken(
+      token,
+      options,
+      (id: any, value: any) => {
+        onCellValueChange?.(id, value);
+      },
+      {
+        schema,
+        placeholder: colLabel,
+        currentValue: readTokenValue(token),
+        updateContext: {
+          ...cellContext,
+          fieldSchemas:
+            options.getRegistry?.()?.getFieldSchemas?.() ?? cellContext.fieldSchemas,
+        },
+      },
+    );
   });
 }
 

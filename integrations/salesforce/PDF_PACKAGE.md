@@ -1,6 +1,14 @@
 # DocEngine PDF package (option 2B)
 
-Optional companion to **DocEngine**. Owns the callout to your hosted `@docengine/pdf-renderer` service (`apps/pdf-service`). Core DocEngine stays editor + data only.
+Optional companion to **DocEngine**. Owns the callout to **your** HTTPS PDF host. Core DocEngine stays editor + data only.
+
+**Recommended host:** n8n workflow with `n8n-nodes-docengine` (Webhook → DocEngine → Respond PDF binary).
+
+Also compatible: `apps/pdf-service` (`POST /pdf/generate`).
+
+docengine-web API links (`/api/v1/render/*`) are for web/client JSON payloads — not the Salesforce Named Credential path.
+
+See [PDF.md](./PDF.md) § Bring your own PDF server.
 
 ## Packages
 

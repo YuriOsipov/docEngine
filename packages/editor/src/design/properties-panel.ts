@@ -12,7 +12,7 @@ import {
 
 /**
  * Right-side properties panel for design mode.
- * @param {{ getRegistry?: () => import('../registry/schema-registry.js').SchemaRegistry, onSaveField?: (result: { fieldId: string, previousFieldId: string, schema: object }) => void | Promise<void>, onSaveSection?: (data: { blockIndex: number, name: string, label: string, repeatable?: boolean, hideTitleInPreview?: boolean, sectionEl?: HTMLElement }) => void | Promise<void>, onSaveDocument?: (pageSetup: object) => void | Promise<void> }} options
+ * @param {{ getRegistry?: () => import('../registry/schema-registry.js').SchemaRegistry, onSaveField?: (result: { fieldId: string, previousFieldId: string, schema: object }) => void | Promise<void>, onSaveSection?: (data: { blockIndex: number, name: string, label: string, repeatable?: boolean, hideTitleInPreview?: boolean, borderTop?: boolean, borderBottom?: boolean, sectionEl?: HTMLElement }) => void | Promise<void>, onSaveDocument?: (pageSetup: object) => void | Promise<void> }} options
  */
 export function createPropertiesPanel({
   getRegistry,
@@ -87,6 +87,15 @@ export function createPropertiesPanel({
       <span>Hide title in preview</span>
     </label>
     <p class="schema-form__hint">When checked, the section title is hidden in document preview. The title remains available for export keys and the design editor.</p>
+    <label class="schema-form__row schema-form__row--checkbox">
+      <input type="checkbox" data-field="section-border-top" />
+      <span>Top border line</span>
+    </label>
+    <label class="schema-form__row schema-form__row--checkbox">
+      <input type="checkbox" data-field="section-border-bottom" />
+      <span>Bottom border line</span>
+    </label>
+    <p class="schema-form__hint">Draw a horizontal rule above and/or below this section in the editor, preview, and PDF.</p>
     <label class="schema-form__row schema-form__row--checkbox">
       <input type="checkbox" data-field="section-repeatable" />
       <span>Show on each page</span>
@@ -402,6 +411,9 @@ export function createPropertiesPanel({
       sectionWrap.querySelector('[data-field="section-repeatable"]').checked = !!data.repeatable;
       sectionWrap.querySelector('[data-field="section-hide-title-in-preview"]').checked =
         !!data.hideTitleInPreview;
+      sectionWrap.querySelector('[data-field="section-border-top"]').checked = !!data.borderTop;
+      sectionWrap.querySelector('[data-field="section-border-bottom"]').checked =
+        !!data.borderBottom;
       const visibility = data.visibility ?? null;
       populateSectionVisibilityFields(visibility?.fieldId ?? '');
       sectionVisibilityEnabled.checked = !!visibility?.fieldId;
@@ -479,6 +491,10 @@ export function createPropertiesPanel({
       const hideTitleInPreview = !!sectionWrap.querySelector(
         '[data-field="section-hide-title-in-preview"]',
       )?.checked;
+      const borderTop = !!sectionWrap.querySelector('[data-field="section-border-top"]')?.checked;
+      const borderBottom = !!sectionWrap.querySelector(
+        '[data-field="section-border-bottom"]',
+      )?.checked;
       const visibility = readSectionVisibilityRule();
       await onSaveSection?.({
         blockIndex: sectionBlockIndex,
@@ -486,6 +502,8 @@ export function createPropertiesPanel({
         label,
         repeatable,
         hideTitleInPreview,
+        borderTop,
+        borderBottom,
         visibility,
         sectionEl: sectionTarget,
       });

@@ -1,4 +1,6 @@
 import { wireModalResize } from './wire-modal-resize.js';
+import { wireModalMove } from './wire-modal-move.js';
+import { wireModalEscape } from './wire-modal-escape.js';
 import { wirePanelSplitter } from './wire-panel-splitter.js';
 
 import { applyMappingBadges, findRuleForMappedToken } from './field-mapping-badges.js';
@@ -472,6 +474,12 @@ export function createFieldMappingModal({ getTemplate, onSave }: any = {}) {
 
   let rejectPromise: any = null;
 
+  /** In-flight open() session — reuses instead of cancelling on double-click. */
+  let sessionPromise: Promise<any> | null = null;
+
+  /** Ignore backdrop clicks from the same gesture that opened the modal. */
+  let backdropCloseArmed = false;
+
   /** @type {((payload: unknown) => Promise<void>) | null} */
 
   let applyHandler: any = null;
@@ -906,171 +914,180 @@ export function createFieldMappingModal({ getTemplate, onSave }: any = {}) {
 
 
 
-  async function destroyNestedEditor() {
+  /** Bumped on every close so in-flight mounts are abandoned. */
+  let mountGeneration = 0;
 
-    if (nestedEditor) {
-
-      nestedEditor.destroy();
-
-      nestedEditor = null;
-
+  function destroyNestedEditor() {
+    const prev = nestedEditor;
+    nestedEditor = null;
+    if (prev && typeof prev.destroy === 'function') {
+      try {
+        prev.destroy();
+      } catch {
+        // EditorJS.destroy() can only run once
+      }
     }
-
     if (editorMountEl) editorMountEl.innerHTML = '';
-
   }
 
-
-
-  async function mountMappingEditor() {
-
-    await destroyNestedEditor();
-
-
-
-    const templateDoc = getTemplate?.();
-
-    if (!templateDoc) return;
-
-
-
-    const stripped = buildTemplateExport(templateDoc);
-
-    const holder = document.createElement('div');
-
-    holder.className = 'field-mapping-editor-holder doc-editor-host';
-
-    editorMountEl.appendChild(holder);
-
-
-
-    const { createEditor } = await import('../create-editor.js');
-
-    nestedEditor = createEditor({
-
-      holder,
-
-      data: {
-
-        time: stripped.time,
-
-        fieldSchemas: stripped.fieldSchemas,
-
-        blocks: stripped.blocks,
-
-        pageSetup: stripped.pageSetup,
-
-      },
-
-      mappingMode: true,
-
-      onMappingRuleChange: handleRuleAssigned,
-      designMode: false,
-
-      ui: {
-
-        embedded: true,
-
-        palette: false,
-
-        richTextToolbar: false,
-
-        documentActions: false,
-
-        showFieldsInFillMode: false,
-
-        stickyChrome: false,
-
-      },
-
-      catalogs: {},
-
+  function armBackdropClose() {
+    backdropCloseArmed = false;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (!overlay.hidden) backdropCloseArmed = true;
+      }, 50);
     });
+  }
 
-
-
-    await nestedEditor.ready;
-
-    syncMappingBadges();
-
+  function wireNestedEditorClicks() {
+    if (!nestedEditor?.holder) return;
     nestedEditor.holder.addEventListener('click', (event: any) => {
       const token = event.target?.closest?.('.field-token--mapped');
-      if (!token || !nestedEditor.holder.contains(token)) return;
+      if (!token || !nestedEditor?.holder?.contains(token)) return;
       const rule = findRuleForMappedToken(token, currentRules);
       if (!rule) return;
       event.preventDefault();
       event.stopPropagation();
-      // Keep result JSON in sync with rules when the textarea isn't mid-edit.
       if (resultJsonEl.dataset.dirty !== 'true') {
         updateResultJsonTextarea();
       }
       revealMappingResultEntry(resultJsonEl, rule);
     });
-
   }
 
+  /**
+   * Mount nested template editor. Does not own the session promise — Cancel must
+   * work even while this is still loading (see open()).
+   */
+  function startNestedEditor(gen: number) {
+    const templateDoc = getTemplate?.();
+    if (!templateDoc || !editorMountEl) return;
 
+    const stripped = buildTemplateExport(templateDoc);
+    const holder = document.createElement('div');
+    holder.className = 'field-mapping-editor-holder doc-editor-host';
+    editorMountEl.appendChild(holder);
 
-  function close() {
+    import('../create-editor.js')
+      .then(({ createEditor }) => {
+        if (gen !== mountGeneration || overlay.hidden) {
+          holder.remove();
+          return;
+        }
+        const ed = createEditor({
+          holder,
+          data: {
+            time: stripped.time,
+            fieldSchemas: stripped.fieldSchemas,
+            blocks: stripped.blocks,
+            pageSetup: stripped.pageSetup,
+          },
+          mappingMode: true,
+          onMappingRuleChange: handleRuleAssigned,
+          designMode: false,
+          ui: {
+            embedded: true,
+            palette: false,
+            richTextToolbar: false,
+            documentActions: false,
+            showFieldsInFillMode: false,
+            stickyChrome: false,
+          },
+          catalogs: {},
+        });
+        nestedEditor = ed;
+        return ed.ready.then(() => {
+          if (gen !== mountGeneration || nestedEditor !== ed || overlay.hidden) {
+            if (nestedEditor === ed) destroyNestedEditor();
+            return;
+          }
+          syncMappingBadges();
+          wireNestedEditorClicks();
+        });
+      })
+      .catch((err) => {
+        if (gen !== mountGeneration) return;
+        validationStatusEl.hidden = false;
+        validationStatusEl.className = 'modal__status modal__status--error';
+        validationStatusEl.textContent =
+          err instanceof Error ? err.message : 'Could not open mapping editor.';
+      });
+  }
 
+  async function close() {
+    mountGeneration += 1;
+    backdropCloseArmed = false;
     overlay.hidden = true;
-
     setFullscreen(false);
-
     pathHelper?.hide();
-
     issueHighlights?.update?.([]);
-
-    void destroyNestedEditor();
-
-    resolvePromise = null;
-
-    rejectPromise = null;
-
+    destroyNestedEditor();
     applyHandler = null;
     onExpandSourcePath = null;
-
   }
 
+  function rejectCancelled() {
+    const err = new Error('cancelled');
+    err.name = 'AbortError';
+    const reject = rejectPromise;
+    rejectPromise = null;
+    resolvePromise = null;
+    reject?.(err);
+  }
 
+  function resolveSession(value: any) {
+    const resolve = resolvePromise;
+    rejectPromise = null;
+    resolvePromise = null;
+    resolve?.(value);
+  }
 
   async function open(options: any = {}) {
+    // Reuse in-flight session (double-click Edit while open).
+    if (sessionPromise && !overlay.hidden) {
+      return sessionPromise;
+    }
+
+    // Abandon any stuck prior session so Edit can open again.
+    if (sessionPromise) {
+      rejectCancelled();
+      await close();
+      sessionPromise = null;
+    }
 
     currentSpec = normalizeFieldMappingSpec(options.spec);
-
     currentRules = [...(currentSpec.rules ?? [])];
-
     applyHandler = options.onApply ?? null;
-
     onExpandSourcePath =
       typeof options.onExpandSourcePath === 'function' ? options.onExpandSourcePath : null;
-
     sourceExpandingPaths.clear();
-
     sourceJsonEl.value = currentSpec.sourceSample
-
       ? JSON.stringify(currentSpec.sourceSample, null, 2)
-
       : '';
-
     renderSourceTree();
-
     refreshResultPanels();
 
+    const gen = ++mountGeneration;
+    destroyNestedEditor();
     overlay.hidden = false;
+    armBackdropClose();
 
-    await mountMappingEditor();
-
-
-
-    return new Promise((resolve, reject) => {
-
+    // Session promise is created FIRST so Cancel works during nested mount.
+    const run = new Promise((resolve, reject) => {
       resolvePromise = resolve;
-
       rejectPromise = reject;
-
     });
+    sessionPromise = run;
 
+    startNestedEditor(gen);
+
+    try {
+      return await run;
+    } finally {
+      if (sessionPromise === run) sessionPromise = null;
+      resolvePromise = null;
+      rejectPromise = null;
+    }
   }
 
 
@@ -1186,94 +1203,54 @@ export function createFieldMappingModal({ getTemplate, onSave }: any = {}) {
 
 
 
-  overlay.querySelector('[data-action="ok"]')?.addEventListener('click', () => {
-
+  overlay.querySelector('[data-action="ok"]')?.addEventListener('click', async () => {
     try {
-
       const spec = buildSpec();
-
       onSave?.(spec);
-
-      resolvePromise?.(spec);
-
-      close();
-
+      resolveSession(spec);
+      await close();
     } catch (err: any) {
-
       validationStatusEl.hidden = false;
-
       validationStatusEl.className = 'modal__status modal__status--error';
-
       validationStatusEl.textContent = err instanceof Error ? err.message : String(err);
-
     }
-
   });
-
-
 
   overlay.querySelector('[data-action="apply"]')?.addEventListener('click', async () => {
-
     try {
-
       const spec = buildSpec();
-
       const payload = parseSourceSample();
-
       if (payload == null) {
-
         throw new Error('Add a source payload sample before applying.');
-
       }
-
       if (!spec.rules?.length) {
-
         throw new Error('Map at least one field before applying.');
-
       }
-
       onSave?.(spec);
-
       await applyHandler?.(payload);
-
-      resolvePromise?.(spec);
-
-      close();
-
+      resolveSession(spec);
+      await close();
     } catch (err: any) {
-
       validationStatusEl.hidden = false;
-
       validationStatusEl.className = 'modal__status modal__status--error';
-
       validationStatusEl.textContent = err instanceof Error ? err.message : String(err);
-
     }
-
   });
 
-
-
-  overlay.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
-
-    rejectPromise?.(new Error('cancelled'));
-
-    close();
-
+  overlay.querySelector('[data-action="cancel"]')?.addEventListener('click', async () => {
+    rejectCancelled();
+    await close();
   });
 
+  overlay.addEventListener('click', async (event) => {
+    if (event.target !== overlay || !backdropCloseArmed) return;
+    rejectCancelled();
+    await close();
+  });
 
-
-  overlay.addEventListener('click', (event) => {
-
-    if (event.target === overlay) {
-
-      rejectPromise?.(new Error('cancelled'));
-
-      close();
-
-    }
-
+  wireModalEscape(overlay, () => {
+    rejectCancelled();
+    void close();
   });
 
   wirePanelSplitter(overlay.querySelector('.field-mapping-modal__body'), {
@@ -1289,6 +1266,7 @@ export function createFieldMappingModal({ getTemplate, onSave }: any = {}) {
       maxWidth: () => (typeof window !== 'undefined' ? window.innerWidth * 0.98 : 1400),
       maxHeight: () => (typeof window !== 'undefined' ? window.innerHeight * 0.95 : 900),
     });
+    wireModalMove(modalEl, { cookieKey: 'field-mapping' });
   }
 
   return { open };

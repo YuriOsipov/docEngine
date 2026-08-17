@@ -5,7 +5,14 @@ import {
 } from '../../services/image-upload.js';
 import { isHtmlValueEmpty } from '../rich-text.js';
 import { registerField } from './registry.js';
-import { escapeAttr, readCheckbox, readInputValue } from './schema-form-dom.js';
+import {
+  escapeAttr,
+  normalizeIntegerDisplayFormat,
+  readCheckbox,
+  readInputValue,
+  readNumericDisplayFormatFields,
+  renderNumericDisplayFormatFields,
+} from './schema-form-dom.js';
 import { formatNumericDisplay } from '@docengine/engine';
 
 function baseSchema(type: any, label: any, name: any) {
@@ -14,21 +21,6 @@ function baseSchema(type: any, label: any, name: any) {
 
 function scalarEmpty(value: any) {
   return value == null || value === '' || (Array.isArray(value) && value.length === 0);
-}
-
-function normalizeIntegerDisplayFormat(value: unknown): 'plain' | 'number' | 'currency' {
-  const raw = String(value ?? '')
-    .trim()
-    .toLowerCase();
-  if (raw === 'number' || raw === 'currency') return raw;
-  return 'plain';
-}
-
-function readOptionalInteger(host: ParentNode, field: string): number | '' {
-  const raw = readInputValue(host, field).trim();
-  if (!raw) return '';
-  const num = Number(raw);
-  return Number.isInteger(num) && num >= 0 && num <= 20 ? num : '';
 }
 
 /** @type {import('./registry.js').FieldHandler[]} */
@@ -129,11 +121,6 @@ const BUILTIN_HANDLERS = [
       };
     },
     renderSchemaFields(host: any, schema: any) {
-      const displayFormat = normalizeIntegerDisplayFormat(schema.displayFormat);
-      const fractionDigits =
-        schema.fractionDigits == null || schema.fractionDigits === ''
-          ? ''
-          : String(schema.fractionDigits);
       host.innerHTML = `
         <label class="schema-form__row">
           <span>Min</span>
@@ -147,60 +134,16 @@ const BUILTIN_HANDLERS = [
           <span>Default value</span>
           <input type="number" data-field="defaultValue" value="${escapeAttr(schema.defaultValue ?? '')}" />
         </label>
-        <label class="schema-form__row">
-          <span>Display format</span>
-          <select data-field="displayFormat">
-            <option value="plain"${displayFormat === 'plain' ? ' selected' : ''}>Plain</option>
-            <option value="number"${displayFormat === 'number' ? ' selected' : ''}>Number</option>
-            <option value="currency"${displayFormat === 'currency' ? ' selected' : ''}>Currency</option>
-          </select>
-        </label>
-        <label class="schema-form__row" data-role="currency-code-row">
-          <span>Currency</span>
-          <input type="text" data-field="currencyCode" value="${escapeAttr(schema.currencyCode ?? 'EUR')}" placeholder="EUR" maxlength="3" />
-        </label>
-        <label class="schema-form__row" data-role="fraction-digits-row">
-          <span>Fraction digits</span>
-          <input type="number" data-field="fractionDigits" min="0" max="20" value="${escapeAttr(fractionDigits)}" placeholder="auto" />
-        </label>
-        <label class="schema-form__row" data-role="suffix-row">
-          <span>Suffix</span>
-          <input type="text" data-field="suffix" value="${escapeAttr(schema.suffix ?? '')}" placeholder="e.g. mmHg" />
-        </label>
-        <p class="schema-form__hint" data-role="display-format-hint">Stored value stays a plain number. Format applies in the document, preview, and PDF.</p>
       `;
-      const formatSelect = host.querySelector('[data-field="displayFormat"]');
-      const currencyRow = host.querySelector('[data-role="currency-code-row"]');
-      const fractionRow = host.querySelector('[data-role="fraction-digits-row"]');
-      const suffixRow = host.querySelector('[data-role="suffix-row"]');
-      const setHidden = (el: Element | null, hidden: boolean) => {
-        if (el && 'hidden' in el) (el as HTMLElement).hidden = hidden;
-      };
-      const syncRows = (mode: string) => {
-        setHidden(currencyRow, mode !== 'currency');
-        setHidden(fractionRow, mode === 'plain');
-        setHidden(suffixRow, mode === 'currency');
-      };
-      syncRows(displayFormat);
-      formatSelect?.addEventListener('change', (e: Event) => {
-        const target = e.target as HTMLSelectElement | null;
-        if (!target) return;
-        syncRows(normalizeIntegerDisplayFormat(target.value));
-      });
+      renderNumericDisplayFormatFields(host, schema, { append: true });
     },
     readSchemaFields(host: any) {
       const defaultValue = readInputValue(host, 'defaultValue');
-      const displayFormat = normalizeIntegerDisplayFormat(readInputValue(host, 'displayFormat'));
-      const fractionDigits = readOptionalInteger(host, 'fractionDigits');
-      const currencyCode = readInputValue(host, 'currencyCode').trim().toUpperCase() || 'EUR';
       return {
         min: Number(readInputValue(host, 'min') || 0),
         max: Number(readInputValue(host, 'max') || 999),
         defaultValue: defaultValue === '' ? '' : String(defaultValue),
-        suffix: readInputValue(host, 'suffix'),
-        displayFormat,
-        currencyCode,
-        fractionDigits,
+        ...readNumericDisplayFormatFields(host),
       };
     },
     formatDisplay(value: any, { schema, def, emptyLabel }: any) {
@@ -223,21 +166,60 @@ const BUILTIN_HANDLERS = [
     paletteOrder: 40,
     editableInFill: false,
     createSchema(label: any, name: any) {
-      return { ...baseSchema('computed', label, name), formula: '' };
+      return {
+        ...baseSchema('computed', label, name),
+        formula: '',
+        suffix: '',
+        displayFormat: 'plain',
+        currencyCode: 'EUR',
+      };
     },
     getEmptyValue: () => '',
     resolveDefaultValue() {
       return '';
     },
     toDisplayConfig(schema: any) {
-      return { picker: 'computed', label: schema.label };
+      return {
+        picker: 'computed',
+        label: schema.label,
+        suffix: schema.suffix ?? '',
+        displayFormat: normalizeIntegerDisplayFormat(schema.displayFormat),
+        currencyCode: schema.currencyCode ?? 'EUR',
+        fractionDigits: schema.fractionDigits,
+      };
     },
     toPickerConfig(schema: any) {
-      return { picker: 'computed', label: schema.label, formula: schema.formula ?? '' };
+      return {
+        picker: 'computed',
+        label: schema.label,
+        formula: schema.formula ?? '',
+        suffix: schema.suffix ?? '',
+        displayFormat: normalizeIntegerDisplayFormat(schema.displayFormat),
+        currencyCode: schema.currencyCode ?? 'EUR',
+        fractionDigits: schema.fractionDigits,
+      };
     },
-    formatDisplay(value: any, { emptyLabel }: any) {
+    /** Appended after the formula UI in the schema editor (does not replace it). */
+    renderSchemaFields(host: any, schema: any) {
+      renderNumericDisplayFormatFields(host, schema, {
+        append: true,
+        hint: 'Computed result stays unformatted internally. Format applies in the document, preview, and PDF.',
+      });
+    },
+    readSchemaFields(host: any) {
+      return {
+        formula: readInputValue(host, 'formula'),
+        ...readNumericDisplayFormatFields(host),
+      };
+    },
+    formatDisplay(value: any, { schema, def, emptyLabel }: any) {
       if (scalarEmpty(value)) return emptyLabel ?? '';
-      return String(value);
+      return formatNumericDisplay(value, {
+        displayFormat: def?.displayFormat ?? schema?.displayFormat,
+        currencyCode: def?.currencyCode ?? schema?.currencyCode,
+        fractionDigits: def?.fractionDigits ?? schema?.fractionDigits,
+        suffix: def?.suffix ?? schema?.suffix,
+      });
     },
     isEmpty(value: any) {
       return scalarEmpty(value);
@@ -348,6 +330,34 @@ const BUILTIN_HANDLERS = [
             : catalogs.resolveSchemaItems(schema),
       };
     },
+    formatDisplay(value: any, { schema, def, emptyLabel }: any) {
+      if (value == null || (Array.isArray(value) && value.length === 0) || value === '') {
+        return emptyLabel ?? '';
+      }
+      // Let non-list shapes fall through to generic formatting.
+      if (typeof value === 'object' && !Array.isArray(value)) return null;
+      const items = def?.items ?? schema?.items ?? [];
+      const resolveOne = (raw: any) => {
+        const key = String(raw ?? '');
+        const found = items.find((item: any) => item?.id === key || item?.label === key);
+        return found?.label ?? key;
+      };
+      const labels = Array.isArray(value) ? value.map(resolveOne) : [resolveOne(value)];
+      const layout = def?.itemLayout ?? schema?.itemLayout ?? 'inline';
+      const prefix = def?.itemPrefix ?? schema?.itemPrefix ?? '';
+      switch (layout) {
+        case 'lines':
+          return labels.join('\n');
+        case 'bullet':
+          return labels.map((v: any) => `• ${v}`).join('\n');
+        case 'numeric':
+          return labels.map((v: any, i: any) => `${i + 1}. ${v}`).join('\n');
+        case 'custom':
+          return labels.map((v: any) => `${prefix}${v}`).join('\n');
+        default:
+          return labels.join('; ');
+      }
+    },
     isEmpty(value: any) {
       return scalarEmpty(value);
     },
@@ -393,6 +403,22 @@ const BUILTIN_HANDLERS = [
             ? []
             : catalogs.resolveSchemaItems(schema),
       };
+    },
+    formatDisplay(value: any, { schema, def, emptyLabel }: any) {
+      if (scalarEmpty(value)) return emptyLabel ?? '';
+      const items = def?.items ?? schema?.items ?? [];
+      const withCode = !!(def?.withCode ?? schema?.withCode);
+      const resolveOne = (raw: any) => {
+        const key = String(raw ?? '');
+        const found = items.find((item: any) => item?.id === key || item?.label === key);
+        if (!found) return key;
+        if (withCode && found.code) return `${found.code} — ${found.label}`;
+        return found.label ?? key;
+      };
+      if (Array.isArray(value)) {
+        return value.map(resolveOne).filter(Boolean).join('; ');
+      }
+      return resolveOne(value);
     },
     isEmpty(value: any) {
       return scalarEmpty(value);

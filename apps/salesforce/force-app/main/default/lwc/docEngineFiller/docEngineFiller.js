@@ -15,7 +15,9 @@ import {
   resolvePdfProvider,
   exportHtmlForPdf,
   emptyDocument,
-  parseJsonSafe
+  parseJsonSafe,
+  replaceEmbeddedImageDataUrls,
+  apexErrorMessage
 } from 'c/docEngineLib';
 
 const STATUS_OPTIONS = [
@@ -188,6 +190,7 @@ export default class DocEngineFiller extends LightningElement {
           documentActionsContainer: docActions,
           designMode: false,
           data: this._initialData || emptyDocument(),
+          recordId: this.recordId,
           resolveListItems: this._resolveListItems.bind(this),
           onShareDocument: (artifact) => this._openShareDialog(artifact)
         })
@@ -300,13 +303,14 @@ export default class DocEngineFiller extends LightningElement {
   }
 
   async _saveInstanceOnly() {
-    const values =
+    let values =
       typeof this._editor.exportFields === 'function'
         ? await this._editor.exportFields()
         : null;
     if (!values) {
       throw new Error('exportFields is not available on the editor.');
     }
+    values = await replaceEmbeddedImageDataUrls(values, this.recordId);
     const saved = await saveInstance({
       dto: {
         id: this._instanceId,
@@ -384,7 +388,7 @@ export default class DocEngineFiller extends LightningElement {
   }
 
   _showError(title, err) {
-    const message = (err && (err.body && err.body.message)) || (err && err.message) || String(err);
+    const message = apexErrorMessage(err);
     this.dispatchEvent(new ShowToastEvent({ title, message, variant: 'error', mode: 'sticky' }));
   }
 }

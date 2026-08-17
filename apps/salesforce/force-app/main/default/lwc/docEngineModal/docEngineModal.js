@@ -1,6 +1,7 @@
 import { api } from 'lwc';
 import LightningModal from 'lightning/modal';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import LightningConfirm from 'lightning/confirm';
 import getTemplate from '@salesforce/apex/DocEngineTemplateController.getTemplate';
 import buildPayload from '@salesforce/apex/DocEngineMergeController.buildPayload';
 import saveInstance from '@salesforce/apex/DocEngineInstanceController.saveInstance';
@@ -18,7 +19,9 @@ import {
   exportHtmlForPdf,
   emptyDocument,
   parseJsonSafe,
-  resolveReopenEditorData
+  resolveReopenEditorData,
+  replaceEmbeddedImageDataUrls,
+  apexErrorMessage
 } from 'c/docEngineLib';
 
 function escapeHtml(text) {
@@ -76,6 +79,16 @@ export default class DocEngineModal extends LightningModal {
   _documentStatus = 'Draft';
   /** True while Document preview overlay is open (Cancel closes preview only). */
   _previewOpen = false;
+  /** True while a nested field dialog (list/tree/…) is open — keep ESC on the dialog. */
+  _nestedModalOpen = false;
+  _onHostKeydown = null;
+  /** Fast dirty flag; set only by real user edits. Confirm skipped when false. */
+  _dirty = false;
+  _baselineValuesJson = null;
+  _confirmCloseBusy = false;
+  _onEditorDomInput = null;
+  /** Ignore dirty marks during initial load/merge. */
+  _suppressDirty = true;
 
   get effectiveRecordId() {
     return this.recordId || this._recordIdFallback || '';
@@ -91,6 +104,12 @@ export default class DocEngineModal extends LightningModal {
   }
 
   connectedCallback() {
+    // Esc must never dismiss the fill editor shell (only Cancel / Finish / X after we allow it).
+    // Nested overlays are closed by _handleHostKeydown instead.
+    this.disableClose = true;
+    this._onHostKeydown = (event) => this._handleHostKeydown(event);
+    // Capture in the LWC realm so Esc is blocked even when focus left the editor sandbox.
+    window.addEventListener('keydown', this._onHostKeydown, true);
     Promise.all([checkPdfAvailable(), resolvePdfProvider()]).then(([ok, provider]) => {
       this._pdfAvailable = ok;
       this._pdfProvider = provider || 'Salesforce';
@@ -99,6 +118,10 @@ export default class DocEngineModal extends LightningModal {
   }
 
   disconnectedCallback() {
+    if (this._onHostKeydown) {
+      window.removeEventListener('keydown', this._onHostKeydown, true);
+      this._onHostKeydown = null;
+    }
     this._destroyEditor();
   }
 
@@ -189,12 +212,20 @@ export default class DocEngineModal extends LightningModal {
           documentActionsContainer: docActions,
           designMode: false,
           data: this._initialData || emptyDocument(),
+          recordId: this.effectiveRecordId,
           resolveListItems: this._resolveListItems.bind(this),
           onShareDocument: (artifact) => this._openShareDialog(artifact),
           onPreviewStateChange: (open) => {
             this._previewOpen = !!open;
-            // Keep ESC / header X from dismissing the editor while preview is up.
-            this.disableClose = !!open;
+            this._syncDisableClose();
+          },
+          onNestedModalStateChange: (open) => {
+            this._nestedModalOpen = !!open;
+            this._syncDisableClose();
+          },
+          onFieldPickerApplied: () => {
+            // OK / Clear on a field dialog — not open/close/cancel alone.
+            this._markDirty();
           },
           ui: {
             showPreview: this._asBool(this.showPreview, true)
@@ -233,6 +264,13 @@ export default class DocEngineModal extends LightningModal {
           this._showToast('Merge warning', (e && e.message) || 'Merge failed', 'warning');
         }
       }
+
+      this._wireEditorDirtyTracking(editorRoot);
+      // Capture twice so post-ready Editor.js/DOM normalization is not treated as edits.
+      await this._captureBaseline();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await this._captureBaseline();
+      this._suppressDirty = false;
 
       this._editorInitialized = true;
 
@@ -316,6 +354,7 @@ export default class DocEngineModal extends LightningModal {
       this.busy = true;
       this.showSpinner = true;
       await this._saveInstanceOnly('Draft');
+      await this._captureBaseline();
       this._showToast('Draft saved', 'Document saved as Draft.', 'success');
     } catch (err) {
       this._showError('Save Draft failed', err);
@@ -325,16 +364,86 @@ export default class DocEngineModal extends LightningModal {
     }
   }
 
-  handleCancel(event) {
+  async handleCancel(event) {
     if (event && typeof event.stopPropagation === 'function') {
       event.stopPropagation();
+    }
+    if (this._confirmCloseBusy || this.busy) {
+      return;
     }
     // Close Document preview first — do not dismiss the editor.
     if (this._closeNestedPreviewIfOpen()) {
       return;
     }
-    this.disableClose = false;
-    this.close('cancelled');
+    // Close nested field dialog (list/tree/…) before dismissing the editor.
+    if (this._closeOpenFieldOverlay()) {
+      return;
+    }
+    if (await this._confirmDiscardIfDirty()) {
+      this.disableClose = false;
+      this.close('cancelled');
+    }
+  }
+
+  _wireEditorDirtyTracking(editorRoot) {
+    if (!editorRoot || this._onEditorDomInput) return;
+    this._onEditorDomInput = (event) => {
+      // beforeinput/paste are user gestures. Generic "input"/"change" also fire from
+      // programmatic token updates and Editor.js normalization — ignore those.
+      const type = event && event.type;
+      if (type === 'beforeinput' || type === 'paste') {
+        this._markDirty();
+      }
+    };
+    editorRoot.addEventListener('beforeinput', this._onEditorDomInput, true);
+    editorRoot.addEventListener('paste', this._onEditorDomInput, true);
+  }
+
+  _markDirty() {
+    if (this._suppressDirty) return;
+    this._dirty = true;
+  }
+
+  async _captureBaseline() {
+    if (!this._editor || typeof this._editor.exportFields !== 'function') {
+      this._baselineValuesJson = null;
+      this._dirty = false;
+      return;
+    }
+    try {
+      const values = await this._editor.exportFields();
+      this._baselineValuesJson = JSON.stringify(values ?? null);
+      this._dirty = false;
+    } catch (e) {
+      this._baselineValuesJson = null;
+      this._dirty = false;
+    }
+  }
+
+  async _hasUnsavedChanges() {
+    // Confirmation only after a real user edit gesture or applied field-picker result.
+    return !!this._dirty;
+  }
+
+  /**
+   * @returns {Promise<boolean>} true if the editor may close
+   */
+  async _confirmDiscardIfDirty() {
+    if (!(await this._hasUnsavedChanges())) {
+      return true;
+    }
+    this._confirmCloseBusy = true;
+    try {
+      const confirmed = await LightningConfirm.open({
+        message: 'You have unsaved changes. Close without saving?',
+        variant: 'header',
+        label: 'Unsaved changes',
+        theme: 'warning'
+      });
+      return !!confirmed;
+    } finally {
+      this._confirmCloseBusy = false;
+    }
   }
 
   _closeNestedPreviewIfOpen() {
@@ -369,8 +478,91 @@ export default class DocEngineModal extends LightningModal {
       }
     }
     this._previewOpen = false;
-    this.disableClose = false;
+    this._syncDisableClose();
     return true;
+  }
+
+  _syncDisableClose() {
+    // Always keep the Lightning shell non-dismissible via Esc while this modal is open.
+    // handleCancel / handleFinish / _destroyEditor flip disableClose off before close().
+    this.disableClose = true;
+  }
+
+  /**
+   * Esc closes nested preview / field dialogs only — never the editor shell.
+   * (Lightning may handle Esc before our listeners; disableClose is the real shell guard.)
+   */
+  _handleHostKeydown(event) {
+    if (!event || (event.key !== 'Escape' && event.key !== 'Esc' && event.code !== 'Escape')) {
+      return;
+    }
+    // Always consume Esc so it cannot dismiss the Lightning modal when focus is
+    // in padding / header / footer outside the editor canvas.
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+    if (this._closeNestedPreviewIfOpen()) {
+      return;
+    }
+    this._closeOpenFieldOverlay();
+  }
+
+  _findOpenFieldOverlay() {
+    const match = (root) => {
+      if (!root || typeof root.querySelector !== 'function') return null;
+      const nodes = root.querySelectorAll(
+        '.modal-overlay--palette:not([hidden]), .modal-overlay.modal-overlay--palette:not([hidden])'
+      );
+      for (let i = 0; i < nodes.length; i += 1) {
+        const el = nodes[i];
+        if (el.classList && el.classList.contains('modal-overlay--preview')) continue;
+        if (el.hidden) continue;
+        return el;
+      }
+      return null;
+    };
+    let node = this.template && this.template.host;
+    const seen = new Set();
+    while (node && !seen.has(node)) {
+      seen.add(node);
+      const found = match(node);
+      if (found) return found;
+      const root = typeof node.getRootNode === 'function' ? node.getRootNode() : null;
+      if (root && root.host) {
+        node = root.host;
+        continue;
+      }
+      node = node.parentElement || node.parentNode;
+    }
+    try {
+      return match(document);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _closeOpenFieldOverlay() {
+    const overlay = this._findOpenFieldOverlay();
+    if (overlay) {
+      const closeBtn =
+        overlay.querySelector('[data-action="close"]') ||
+        overlay.querySelector('.modal__footer .btn:not(.btn-primary)');
+      if (closeBtn && typeof closeBtn.click === 'function') {
+        closeBtn.click();
+      } else {
+        overlay.hidden = true;
+      }
+      this._nestedModalOpen = false;
+      this._syncDisableClose();
+      return true;
+    }
+    // Flag set but overlay not queryable (LWS) — still consume Esc so the shell stays open.
+    if (this._nestedModalOpen === true) {
+      return true;
+    }
+    return false;
   }
 
   _findOpenPreviewOverlay() {
@@ -402,13 +594,14 @@ export default class DocEngineModal extends LightningModal {
   }
 
   async _saveInstanceOnly(status = 'Completed') {
-    const values =
+    let values =
       typeof this._editor.exportFields === 'function'
         ? await this._editor.exportFields()
         : null;
     if (!values) {
       throw new Error('exportFields is not available on the editor.');
     }
+    values = await replaceEmbeddedImageDataUrls(values, this.effectiveRecordId);
     const saved = await saveInstance({
       dto: {
         id: this._instanceId,
@@ -497,8 +690,23 @@ export default class DocEngineModal extends LightningModal {
 
   _destroyEditor() {
     this._previewOpen = false;
+    this._nestedModalOpen = false;
+    this._dirty = false;
+    this._baselineValuesJson = null;
     this.disableClose = false;
     this._pendingValues = null;
+    if (this._onEditorDomInput) {
+      try {
+        const editorRoot = this.template && this.template.querySelector('.editor-root');
+        if (editorRoot) {
+          editorRoot.removeEventListener('beforeinput', this._onEditorDomInput, true);
+          editorRoot.removeEventListener('paste', this._onEditorDomInput, true);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+      this._onEditorDomInput = null;
+    }
     if (this._editor && typeof this._editor.destroy === 'function') {
       this._editor.destroy();
     }
@@ -526,8 +734,7 @@ export default class DocEngineModal extends LightningModal {
   }
 
   _showError(title, err) {
-    const message =
-      (err && err.body && err.body.message) || (err && err.message) || String(err);
+    const message = apexErrorMessage(err);
     this.errorMessage = message;
     this.dispatchEvent(
       new ShowToastEvent({ title, message, variant: 'error', mode: 'sticky' })

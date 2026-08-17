@@ -8,6 +8,7 @@ import {
   buildDocumentExportFromInput,
   buildFullDocumentExport,
   getByPath,
+  resolveInputValues,
   resolveTemplateFromItem,
 } from './docengine-utils.js';
 
@@ -86,5 +87,51 @@ test('resolveTemplateFromItem rejects invalid template kind', () => {
   assert.throws(
     () => resolveTemplateFromItem({ kind: 'bogus', blocks: [] }),
     /kind "template"/,
+  );
+});
+
+test('resolveInputValues uses a mapped object from n8n JS/expression mode', () => {
+  const incoming = {
+    kind: 'document',
+    sections: {
+      Anamnesis: {
+        Complaints: ['Vision disturbance decreased acuity.', 'Tearing'],
+        'Life history': ['Chronic conditions hypertension'],
+      },
+    },
+  };
+  const mapped = {
+    sections: {
+      Anamnesis: {
+        Complaints: 'Vision disturbance decreased acuity.',
+        'Life history': 'Chronic conditions hypertension',
+      },
+    },
+  };
+  assert.deepEqual(resolveInputValues(mapped, incoming), mapped);
+});
+
+test('resolveInputValues parses a JSON object string', () => {
+  const incoming = { kind: 'document', sections: { Anamnesis: { Complaints: ['all'] } } };
+  const json = '{"Complaints":"first only"}';
+  assert.deepEqual(resolveInputValues(json, incoming), { Complaints: 'first only' });
+});
+
+test('resolveInputValues reads a dot-path', () => {
+  const incoming = { body: { patient: 'Ann' } };
+  assert.deepEqual(resolveInputValues('body', incoming), { patient: 'Ann' });
+});
+
+test('resolveInputValues uses the whole item when path is empty', () => {
+  const incoming = { kind: 'document', sections: { A: { x: 1 } } };
+  assert.equal(resolveInputValues('', incoming), incoming);
+  assert.equal(resolveInputValues(null, incoming), incoming);
+});
+
+test('resolveInputValues does not fall back to the incoming document for a missing path', () => {
+  const incoming = { kind: 'document', sections: { A: { x: 1 } } };
+  assert.throws(
+    () => resolveInputValues('missing.path', incoming),
+    /not found on the incoming item/,
   );
 });

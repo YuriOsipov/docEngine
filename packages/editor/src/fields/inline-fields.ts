@@ -22,6 +22,7 @@ import {
   selectDesignToken,
   getFieldSelectionContainer,
 } from './field-selection.js';
+import { setFillFieldFocus, restoreFillFieldFocusAfterPicker } from './fill-field-focus.js';
 import {
   evaluateComputedField,
   extractFormulaDependencyFieldIds,
@@ -143,6 +144,30 @@ export function ensureFieldTokenCaretAnchors(container: any) {
   });
 }
 
+/** Drop the standalone ZWSP that belongs immediately after a field token (before move/remove). */
+export function removeTrailingCaretBridge(node: any) {
+  const bridge = node?.nextSibling;
+  if (isCaretAnchorTextNode(bridge)) {
+    bridge.remove();
+  }
+}
+
+/**
+ * Insert `node` after `reference` without stealing its caret bridge.
+ * `insertAdjacentElement('afterend')` would place the new node between the
+ * field and its ZWSP, leaving adjacent contenteditable=false tokens with no
+ * place for the caret.
+ */
+export function insertElementAfterPreservingCaretBridge(reference: any, node: any) {
+  if (!reference?.parentNode || !node) return;
+  let anchor = reference;
+  const next = reference.nextSibling;
+  if (isCaretAnchorTextNode(next)) {
+    anchor = next;
+  }
+  anchor.parentNode.insertBefore(node, anchor.nextSibling);
+}
+
 /** Remove caret-anchor zero-width spaces from table data cells. */
 export function pruneTableCellCaretAnchors(container: any) {
   if (!container?.querySelectorAll) return;
@@ -191,14 +216,22 @@ function resolveEditorHolder(container: any, options: any = {}) {
 
 export function collectAllFieldValuesFromHolder(holder: any, localValues: any = {}) {
   if (!holder?.querySelectorAll) {
-    return { ...(localValues ?? {}) };
+    return recoverImageValuesFromDom(null, { ...(localValues ?? {}) });
   }
 
   const merged = {};
   for (const editable of holder.querySelectorAll('.document-section__body')) {
     Object.assign(merged, extractFieldValuesFromDom(editable));
   }
-  return { ...merged, ...(localValues ?? {}) };
+  const out = { ...merged, ...(localValues ?? {}) };
+  // Prefer non-empty live token values over empty stubs in fieldValues (lists, images, etc.).
+  // Stored empties used to win and Document preview would omit fields still visible in the editor.
+  for (const [fieldId, domVal] of Object.entries(merged)) {
+    if (isFieldEmpty(out[fieldId]) && !isFieldEmpty(domVal)) {
+      out[fieldId] = domVal;
+    }
+  }
+  return recoverImageValuesFromDom(holder, out);
 }
 
 function resolveFieldDef(fieldId: any, context: any) {
@@ -302,8 +335,14 @@ export function isFlatRepeaterValue(value: any, repeaterSchema: any) {
 
 export function isFieldEmpty(value: any, options: any = {}) {
   if (value === '—') return true;
-  if (options.repeaterSchema?.type === 'child') {
-    return !repeaterHasContent(value, options.repeaterSchema);
+  const repeaterSchema =
+    options.repeaterSchema?.type === 'child'
+      ? options.repeaterSchema
+      : options.schema?.type === 'child'
+        ? options.schema
+        : undefined;
+  if (repeaterSchema) {
+    return !repeaterHasContent(value, repeaterSchema);
   }
   if (isLegacyRepeaterInstancesWrapper(value)) {
     return !Object.values(value.instances ?? {}).some((inst: any) => {
@@ -521,6 +560,10 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
   const schema = registry?.getFieldSchemas()?.[fieldId] ?? context?.fieldSchemas?.[fieldId];
   token.dataset.placeholder = label;
 
+  // Keep the design grip (and its drag listeners) across content rebuilds.
+  const dragHandle = token.querySelector?.(':scope > .editor-drag-handle') ?? null;
+  if (dragHandle) dragHandle.remove();
+
   token.textContent = '';
   token.classList.remove(
     'field-token--image',
@@ -532,6 +575,7 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
     'field-token--required-missing',
   );
   token.style.removeProperty('--field-image-max-width');
+  if (token.dataset) delete token.dataset.maxWidth;
 
   if (def?.picker === 'computed') {
     token.classList.add('field-token--computed');
@@ -561,24 +605,39 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
   } else if (def?.picker === 'image') {
     const maxW = Number(def.maxWidth) > 0 ? Number(def.maxWidth) : 320;
     token.style.setProperty('--field-image-max-width', `${maxW}px`);
+    token.dataset.maxWidth = String(maxW);
   }
 
   if (schema?.type === 'child') {
     /* rendered above */
   } else if (def?.picker === 'image' && !isImageValueEmpty(value)) {
     const imgVal = normalizeImageValue(value);
+    rememberLiveImageValue(fieldId, imgVal);
     token.classList.add('field-token--image');
+    const maxW = Number(def.maxWidth) > 0 ? Number(def.maxWidth) : 320;
     const thumb = document.createElement('img');
     thumb.className = 'field-token__thumb';
     thumb.draggable = false;
     thumb.src = imgVal.url;
     thumb.alt = imgVal.caption || def.altText || label;
+    // Explicit width helps Salesforce Blob.toPdf (ignores CSS max-width).
+    thumb.setAttribute('width', String(maxW));
+    thumb.style.maxWidth = `${maxW}px`;
+    thumb.style.width = `${maxW}px`;
+    thumb.style.height = 'auto';
     token.appendChild(thumb);
     if (imgVal.caption) {
       const cap = document.createElement('span');
       cap.className = 'field-token__caption';
       cap.textContent = imgVal.caption;
       token.appendChild(cap);
+    }
+  } else if (def?.picker === 'image' && isImageValueEmpty(value)) {
+    rememberLiveImageValue(fieldId, null);
+    // Design/fill: show the field label so an empty Image token is visible and selectable.
+    // Preview: keep optional empties blank (required empties still get a placeholder).
+    if (showEmptyPlaceholder) {
+      token.textContent = label;
     }
   } else if (def?.htmlEditor) {
     token.classList.add('field-token--html');
@@ -610,13 +669,7 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
   token.classList.toggle('field-token--required', isRequired);
   token.classList.toggle('field-token--required-missing', missing);
 
-  if (value != null && typeof value === 'object') {
-    token.dataset.value = JSON.stringify(value);
-  } else if (Array.isArray(value)) {
-    token.dataset.value = JSON.stringify(value);
-  } else {
-    token.dataset.value = String(value ?? '');
-  }
+  writeTokenDatasetValue(token, value);
 
   const isTableCell =
     context?.isTableCell ?? token.classList.contains('field-token--cell');
@@ -636,6 +689,9 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
     applyFieldDisplayStyle(token, displayStyle);
   }
   clearFieldHighlightOverriddenStyles(token, context);
+  if (dragHandle) {
+    token.insertBefore(dragHandle, token.firstChild);
+  }
   if (token.classList.contains('field-token--cell')) {
     pruneTableCellCaretAnchors(token.closest('.vision-table') ?? token.parentElement);
   } else {
@@ -694,6 +750,129 @@ function readRepeaterTokenDatasetValue(token: any) {
   return {};
 }
 
+/**
+ * Large data:/blob: image URLs exceed DOM/LWS data-attribute limits and throw.
+ * Keep the real URL on the live <img> (and section fieldValues); dataset stores a compact stub.
+ */
+const DATASET_URL_MAX_CHARS = 2048;
+
+/** fieldId → last known image value (survives empty data-value stubs during save/preview). */
+const liveImageValuesByFieldId = new Map();
+
+function isEmbeddedImageDatasetStub(value: any) {
+  return !!(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    value.embedded === true &&
+    typeof value.url === 'string'
+  );
+}
+
+function readImageUrlFromToken(token: any) {
+  const img = token?.querySelector?.('img.field-token__thumb');
+  if (!img) return '';
+  const src = String(img.getAttribute('src') || img.src || '').trim();
+  if (!src || src.startsWith('about:')) return '';
+  return src;
+}
+
+function rememberLiveImageValue(fieldId: any, value: any) {
+  if (!fieldId) return;
+  if (isImageValueEmpty(value)) {
+    liveImageValuesByFieldId.delete(fieldId);
+    return;
+  }
+  liveImageValuesByFieldId.set(fieldId, normalizeImageValue(value));
+}
+
+function resolveImageValueFromToken(token: any, parsed: any = null) {
+  const fieldId = token?.dataset?.fieldId;
+  const caption = parsed?.caption ?? '';
+  const fromImg = readImageUrlFromToken(token);
+  if (fromImg) {
+    const value = { url: fromImg, caption };
+    rememberLiveImageValue(fieldId, value);
+    return value;
+  }
+  const fromMemory = fieldId ? liveImageValuesByFieldId.get(fieldId) : null;
+  if (fromMemory && !isImageValueEmpty(fromMemory)) {
+    return {
+      url: fromMemory.url,
+      caption: caption || fromMemory.caption || '',
+    };
+  }
+  return { url: '', caption };
+}
+
+/**
+ * Fill empty/stub image fieldValues from live thumbs (and the in-memory map).
+ * Call after DOM extract / editor.save so HTML preview keeps uploaded images.
+ */
+export function recoverImageValuesFromDom(container: any, fieldValues: any = {}) {
+  const next = fieldValues && typeof fieldValues === 'object' ? fieldValues : {};
+  if (!container?.querySelectorAll) {
+    for (const [fieldId, value] of liveImageValuesByFieldId.entries()) {
+      if (isImageValueEmpty(next[fieldId])) next[fieldId] = { ...value };
+    }
+    return next;
+  }
+
+  container.querySelectorAll('.field-token').forEach((token: any) => {
+    const fieldId = token.dataset?.fieldId;
+    if (!fieldId) return;
+    const hasImageUi =
+      token.classList.contains('field-token--image') || !!token.querySelector('img.field-token__thumb');
+    if (!hasImageUi && !liveImageValuesByFieldId.has(fieldId)) return;
+
+    const recovered = resolveImageValueFromToken(token, normalizeImageValue(next[fieldId]));
+    if (!isImageValueEmpty(recovered) && isImageValueEmpty(next[fieldId])) {
+      next[fieldId] = recovered;
+    } else if (!isImageValueEmpty(recovered)) {
+      rememberLiveImageValue(fieldId, recovered);
+      if (isImageValueEmpty(next[fieldId])) next[fieldId] = recovered;
+    }
+  });
+
+  for (const [fieldId, value] of liveImageValuesByFieldId.entries()) {
+    if (isImageValueEmpty(next[fieldId])) next[fieldId] = { ...value };
+  }
+  return next;
+}
+
+function toDatasetFieldValue(value: any) {
+  if (value != null && typeof value === 'object' && !Array.isArray(value) && typeof value.url === 'string') {
+    const url = String(value.url ?? '');
+    if (url.startsWith('data:') || url.startsWith('blob:') || url.length > DATASET_URL_MAX_CHARS) {
+      return JSON.stringify({
+        url: '',
+        caption: value.caption ?? '',
+        embedded: true,
+      });
+    }
+  }
+  if (value != null && typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  return String(value ?? '');
+}
+
+function writeTokenDatasetValue(token: any, value: any) {
+  try {
+    token.dataset.value = toDatasetFieldValue(value);
+  } catch (err) {
+    try {
+      delete token.dataset.value;
+    } catch {
+      /* ignore */
+    }
+    console.warn('[docengine] Could not store field value on token dataset', err);
+  }
+}
+
 export function readTokenValue(token: any) {
   if (token.classList.contains('field-token--repeater')) {
     return readRepeaterTokenValue(token);
@@ -701,15 +880,26 @@ export function readTokenValue(token: any) {
 
   const raw = token.dataset.value;
   if (!raw && raw !== '0') {
+    if (token.classList.contains('field-token--image') || token.querySelector?.('img.field-token__thumb')) {
+      return resolveImageValueFromToken(token);
+    }
     if (token.classList.contains('field-token--empty')) return '';
-    const text = normalizeScalarTokenValue(token.textContent.replace(/×$/, '').trim());
+    const text = normalizeScalarTokenValue(readFieldTokenVisibleText(token).replace(/×$/, '').trim());
     if (isTableCellPlaceholderValue(token, text, token.dataset.placeholder)) return '';
     return text;
   }
 
   if (raw.startsWith('[') || raw.startsWith('{')) {
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Compact stub — recover real URL from live <img> / memory.
+      if (
+        isEmbeddedImageDatasetStub(parsed) ||
+        (token.classList.contains('field-token--image') && isImageValueEmpty(parsed))
+      ) {
+        return resolveImageValueFromToken(token, parsed);
+      }
+      return parsed;
     } catch {
       return normalizeScalarTokenValue(raw);
     }
@@ -1020,18 +1210,57 @@ function renderTableSegment(seg: any, fieldValues: any, options: any = {}) {
   return wrapper;
 }
 
+/**
+ * Visible label/value text for a field token, excluding the design grip chrome.
+ * Whole-token `draggable` would steal native text drag-and-drop and drop selected
+ * text on failed moves — only the grip is draggable.
+ */
+function readFieldTokenVisibleText(token: any) {
+  if (!token) return '';
+  const parts: string[] = [];
+  for (const child of token.childNodes ?? []) {
+    if (child.nodeType === Node.ELEMENT_NODE && child.classList?.contains('editor-drag-handle')) {
+      continue;
+    }
+    parts.push(child.textContent ?? '');
+  }
+  return parts.join('');
+}
+
+function ensureFieldTokenDragHandle(token: any) {
+  if (!token || token.classList.contains('field-token--cell')) return null;
+  let handle = token.querySelector?.(':scope > .editor-drag-handle') ?? null;
+  if (!handle) {
+    handle = createDragHandle({
+      dataset: { action: 'drag-field' },
+      hintTitle: 'Drag to move',
+    });
+    token.insertBefore(handle, token.firstChild);
+  }
+  return handle;
+}
+
 function makeFieldTokenDraggable(token: any) {
   if (token.classList.contains('field-token--cell')) return;
 
-  token.draggable = true;
-  token.addEventListener('dragstart', (e: any) => {
+  // Never make the whole token draggable — that breaks selecting/dragging
+  // nearby prose (browser cuts the selection, then HTML5 DnD never pastes it).
+  token.draggable = false;
+  const handle = ensureFieldTokenDragHandle(token);
+  if (!handle) return;
+
+  handle.draggable = true;
+  if (handle.dataset.fieldDragWired === 'true') return;
+  handle.dataset.fieldDragWired = 'true';
+
+  handle.addEventListener('dragstart', (e: any) => {
     e.stopPropagation();
     draggedFieldToken = token;
     token.classList.add('field-token--dragging');
     e.dataTransfer.effectAllowed = 'move';
     setInternalDragData(e, token.dataset.fieldId ?? 'field');
   });
-  token.addEventListener('dragend', () => {
+  handle.addEventListener('dragend', () => {
     token.classList.remove('field-token--dragging');
     draggedFieldToken = null;
     clearDropIndicators();
@@ -1043,8 +1272,8 @@ function makeFieldTokenDraggable(token: any) {
 
 function attachDesignToken(token: any, fieldId: any, { onEditSchema, designPropertiesPanel }: any) {
   token.title = designPropertiesPanel
-    ? 'Click to select and drag to move. Double-click to edit field.'
-    : 'Drag to move. Double-click to edit. Delete or Backspace removes the field.';
+    ? 'Click to select. Drag the grip to move. Double-click to edit field.'
+    : 'Drag the grip to move. Double-click to edit. Delete or Backspace removes the field.';
 
   token.addEventListener('click', (e: any) => {
     e.preventDefault();
@@ -1070,7 +1299,7 @@ export function wireDesignFieldToken(token: any, { onEditSchema, onDeleteField, 
   token.classList.add('field-token--design');
   if (token.dataset.designWired === 'true') {
     if (!token.classList.contains('field-token--cell')) {
-      token.draggable = true;
+      makeFieldTokenDraggable(token);
     }
     return;
   }
@@ -1946,12 +2175,15 @@ export function insertFieldTokenAtCaret(editable: any, token: any) {
   const sel = window.getSelection();
   if (!sel?.rangeCount || !editable.contains(sel.anchorNode)) {
     editable.appendChild(token);
+    ensureFieldTokenCaretAnchors(editable);
+    focusCaretAfter(token);
     return token;
   }
 
   const range = sel.getRangeAt(0);
   range.deleteContents();
   range.insertNode(token);
+  ensureFieldTokenCaretAnchors(editable);
   focusCaretAfter(token);
   return token;
 }
@@ -2012,6 +2244,7 @@ function placeNodeAtPoint(sectionBody: any, node: any, clientX: any, clientY: an
     return applyInlineDropTarget(editableRoot, node, target);
   }
   editableRoot.appendChild(node);
+  ensureFieldTokenCaretAnchors(editableRoot);
   focusCaretAfter(node);
   return true;
 }
@@ -2302,31 +2535,23 @@ function applyInlineDropTarget(editableRoot: any, node: any, target: any) {
 
   if (target.mode === 'append') {
     editableRoot.appendChild(node);
-    focusCaretAfter(node);
-    return true;
-  }
-
-  if (target.mode === 'before') {
+  } else if (target.mode === 'before') {
     target.element.parentNode.insertBefore(node, target.element);
-    focusCaretAfter(node);
-    return true;
+  } else if (target.mode === 'after') {
+    insertElementAfterPreservingCaretBridge(target.element, node);
+  } else {
+    const range = target.range;
+    if (!range || !editableRoot.contains(range.commonAncestorContainer)) {
+      editableRoot.appendChild(node);
+    } else {
+      range.collapse(true);
+      range.insertNode(node);
+    }
   }
 
-  if (target.mode === 'after') {
-    target.element.insertAdjacentElement('afterend', node);
-    focusCaretAfter(node);
-    return true;
-  }
-
-  const range = target.range;
-  if (!range || !editableRoot.contains(range.commonAncestorContainer)) {
-    editableRoot.appendChild(node);
-    focusCaretAfter(node);
-    return true;
-  }
-
-  range.collapse(true);
-  range.insertNode(node);
+  // Repair bridges for every field in the editable — drop/insert can leave
+  // adjacent contenteditable=false tokens with no ZWSP between them.
+  ensureFieldTokenCaretAnchors(editableRoot);
   focusCaretAfter(node);
   return true;
 }
@@ -2523,6 +2748,7 @@ function repositionFieldAtPoint(
     (crossSection ? { mode: 'append' } : null);
   if (!target) return false;
 
+  removeTrailingCaretBridge(token);
   token.remove();
   const moved = applyInlineDropTarget(editableRoot, token, target);
   if (moved && crossSection) {
@@ -2636,7 +2862,7 @@ function wireDesignDragDropContainer(container: any, options: any = {}) {
   container
     .querySelectorAll('.field-token--design:not(.field-token--cell)')
     .forEach((token: any) => {
-      token.draggable = true;
+      makeFieldTokenDraggable(token);
     });
 }
 
@@ -2891,6 +3117,82 @@ export function refreshFieldSchemaInDom(fieldId: any, context: any, root: any = 
   }
 }
 
+/**
+ * Open the fill-mode value picker for a field token (click or keyboard).
+ * Keeps `.field-token--focused` after the dialog closes so Tab can continue.
+ * @returns {Promise<unknown | undefined>} next value, or undefined when cancelled / not editable
+ */
+export async function pickFillFieldFromToken(
+  token: any,
+  callbacks: any,
+  onUpdate: any,
+  options: any = {},
+) {
+  const fieldId = token?.dataset?.fieldId;
+  if (!fieldId || !callbacks) return undefined;
+
+  const registry = registryFrom(callbacks);
+  const schema =
+    options.schema ??
+    registry?.getFieldSchemas()?.[fieldId] ??
+    callbacks.fieldSchemas?.[fieldId];
+  if (!isFieldEditableInFillMode(schema)) return undefined;
+
+  const holder =
+    callbacks.editorHolder ??
+    options.root ??
+    (typeof token.closest === 'function'
+      ? token.closest('.codex-editor, .editor-holder, [data-docengine-editor]')
+      : null) ??
+    document;
+  setFillFieldFocus(token, holder);
+
+  const fromDom = readTokenValue(token);
+  const fromMap = callbacks?.fieldValues?.[fieldId];
+  const emptyOpts = {
+    htmlEditor: !!schema?.htmlEditor,
+    repeaterSchema: schema?.type === 'child' ? schema : undefined,
+  };
+  // Prefer live fieldValues — image data URLs are not stored on data-value.
+  const current =
+    options.currentValue !== undefined
+      ? options.currentValue
+      : fromMap !== undefined && !isFieldEmpty(fromMap, emptyOpts)
+        ? fromMap
+        : fromDom;
+
+  const placeholder = options.placeholder ?? token.dataset.placeholder;
+  const updateContext = options.updateContext ?? callbacks;
+
+  token.classList.add('field-token--active');
+  try {
+    const next = await openFieldPicker(fieldId, current, callbacks);
+    // Persist to fieldValues first: updateFieldToken may fail on huge data-value attrs (LWS).
+    // Resolve the live token AFTER onUpdate — sync/structure hooks may replace the node.
+    onUpdate?.(fieldId, next);
+    const live =
+      findLiveFieldToken(fieldId, holder) ?? (token.isConnected ? token : null);
+    if (live) {
+      live.classList.remove('field-token--active');
+      try {
+        updateFieldToken(live, next, placeholder ?? live.dataset.placeholder, updateContext);
+      } catch (err) {
+        console.warn('[docengine] Failed to refresh field token after pick', err);
+      }
+    }
+    restoreFillFieldFocusAfterPicker(fieldId, holder, live ?? token);
+    return next;
+  } catch {
+    // cancelled — keep focus on the field
+    restoreFillFieldFocusAfterPicker(fieldId, holder, token);
+    return undefined;
+  } finally {
+    token.classList.remove('field-token--active');
+    const live = findLiveFieldToken(fieldId, holder);
+    live?.classList.remove('field-token--active');
+  }
+}
+
 export function wireFieldClicks(container: any, callbacks: any, onUpdate: any, options: any = {}) {
   const { designMode, onEditSchema, onDeleteField, designPropertiesPanel } = options;
 
@@ -2915,25 +3217,6 @@ export function wireFieldClicks(container: any, callbacks: any, onUpdate: any, o
     e.preventDefault();
     e.stopPropagation();
 
-    const current = readTokenValue(token);
-
-    token.classList.add('field-token--active');
-    try {
-      const next = await openFieldPicker(fieldId, current, callbacks);
-      const live =
-        findLiveFieldToken(fieldId, callbacks.editorHolder ?? container) ??
-        (token.isConnected ? token : null);
-      if (!live) {
-        onUpdate?.(fieldId, next);
-        return;
-      }
-      live.classList.remove('field-token--active');
-      updateFieldToken(live, next, live.dataset.placeholder ?? token.dataset.placeholder, callbacks);
-      onUpdate?.(fieldId, next);
-    } catch {
-      // cancelled
-    } finally {
-      token.classList.remove('field-token--active');
-    }
+    await pickFillFieldFromToken(token, callbacks, onUpdate, { schema, root: container });
   });
 }

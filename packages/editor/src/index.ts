@@ -71,12 +71,15 @@ export {
 
 export {
   ROOT_SECTION_KEY,
+  DEFAULT_SECTION_NAME,
   slugSectionKey,
   deriveFieldId,
   deriveUniqueFieldName,
   allocateFieldIdentity,
   deriveCellFieldId,
   resolveSectionName,
+  collectUsedSectionNames,
+  allocateUniqueSectionName,
   ensureSchemaName,
   ensureSchemasHaveName,
   findFieldPlacement,
@@ -178,6 +181,19 @@ export { applyDesignMode, isDesignMode } from './design/design-mode.js';
 export { configureImageUpload } from './services/image-upload.js';
 
 export { evaluateComputedField } from './core/computed-formula.js';
+export {
+  registerFormulaFunction,
+  unregisterFormulaFunction,
+  resetFormulaFunctions,
+  getFormulaFunction,
+  listFormulaFunctions,
+  listFormulaPickerFunctions,
+} from './core/computed-formula.js';
+export type {
+  FormulaFunctionDef,
+  FormulaFunctionKind,
+  FormulaFunctionArity,
+} from './core/computed-formula.js';
 export { renderDocumentPreview, filterSegmentsForPreview } from './fields/document-preview.js';
 export {
   formatFieldDisplay,
@@ -218,6 +234,13 @@ export {
   shortFilenameId,
   slugifyFilename,
 } from './utils/export-filename.js';
+export { createFieldFormModal } from './ui/field-form-modal.js';
+export type {
+  CreateFieldFormModalOptions,
+  FieldFormModal,
+  FieldFormModalElements,
+  FieldFormModalOpenBase,
+} from './ui/field-form-modal.js';
 export { ACTION_ICONS } from './ui/action-icons.js';
 export { promptFilename } from './ui/filename-prompt.js';
 export { saveBlobToDisk } from './utils/save-blob.js';
@@ -227,6 +250,7 @@ export {
   readTokenValue,
   readRepeaterTokenValue,
   openFieldPicker,
+  pickFillFieldFromToken,
 } from './fields/inline-fields.js';
 export {
   getFieldSelectionContainer,

@@ -12,6 +12,9 @@ type SchemaRegistry =
 
 export const ROOT_SECTION_KEY = '_root';
 
+/** Fallback export key when a section has no name/label. */
+export const DEFAULT_SECTION_NAME = 'Untitled';
+
 // Repeater child editors namespace their field ids with this prefix so the
 // round-trip through the modal is stable. These ids must NOT be re-derived from
 // section/field names, otherwise the saved values can no longer be mapped back
@@ -25,7 +28,39 @@ function isRepeaterChildFieldId(fieldId: string | null | undefined): boolean {
 export function resolveSectionName(
   data: DocumentSectionData | Record<string, unknown> | null | undefined,
 ): string {
-  return String(data?.name ?? data?.label ?? '').trim() || 'Untitled';
+  return String(data?.name ?? data?.label ?? '').trim() || DEFAULT_SECTION_NAME;
+}
+
+/**
+ * Collect resolved section export keys from document blocks.
+ */
+export function collectUsedSectionNames(
+  blocks: EditorBlock[] | null | undefined,
+  options: { reservedNames?: Set<string> } = {},
+): Set<string> {
+  const used = new Set(options.reservedNames ?? []);
+  for (const block of blocks ?? []) {
+    if (block?.type !== 'documentSection') continue;
+    used.add(resolveSectionName(block.data ?? {}));
+  }
+  return used;
+}
+
+/**
+ * Allocate a unique section export key (Untitled, Untitled_2, …).
+ * Prevents duplicate `sections.Untitled` keys when multiple empty sections exist.
+ */
+export function allocateUniqueSectionName(
+  usedNames: Set<string> = new Set(),
+  baseName: string = DEFAULT_SECTION_NAME,
+): string {
+  const base = String(baseName ?? '').trim() || DEFAULT_SECTION_NAME;
+  if (!usedNames.has(base)) return base;
+  let index = 2;
+  while (usedNames.has(`${base}_${index}`)) {
+    index += 1;
+  }
+  return `${base}_${index}`;
 }
 
 export function slugSectionKey(sectionName: string | null | undefined): string {
@@ -416,12 +451,12 @@ export function findSectionNameForNode(editable: HTMLElement | null | undefined)
   ) as HTMLInputElement | null;
   if (labelInput) {
     const value = labelInput.value?.trim();
-    return value || 'Untitled';
+    return value || DEFAULT_SECTION_NAME;
   }
 
   const text = section.querySelector('.document-section__label-text');
   const label = text?.textContent?.trim();
-  return label || 'Untitled';
+  return label || DEFAULT_SECTION_NAME;
 }
 
 /** @deprecated Use findSectionNameForNode */

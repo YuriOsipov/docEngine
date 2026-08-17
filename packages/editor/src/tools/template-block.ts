@@ -1,8 +1,7 @@
 import {
   createFieldToken,
-  updateFieldToken,
   readTokenValue,
-  openFieldPicker,
+  pickFillFieldFromToken,
   textToFragment,
   wireDesignFieldToken,
 } from '../fields/inline-fields.js';
@@ -109,12 +108,32 @@ export default class TemplateBlock {
 
     this.wrapper.appendChild(body);
 
-    if (this.config.designMode) {
-      this._unwireKeyboard = wireFieldTokenKeyboard(body, {
-        designMode: true,
-        onDeleteField: (fieldId: any,token: any) => this.config.onDeleteField?.(fieldId, token),
-      });
-    }
+    this._unwireKeyboard = wireFieldTokenKeyboard(body, {
+      designMode: !!this.config.designMode,
+      mappingMode: !!this.config.mappingMode,
+      editorHolder: this.config.editorHolder,
+      getRegistry: this.config.getRegistry,
+      onActivateFillField: async (token: any) => {
+        const fieldId = token?.dataset?.fieldId;
+        if (!fieldId) return;
+        const fieldSchema = getRegistryFromConfig(this.config)?.getFieldSchemas()?.[fieldId];
+        await pickFillFieldFromToken(
+          token,
+          this.config,
+          (id: any, value: any) => {
+            if (id === this.data.fieldId) this.data.value = value;
+            else if (this.data.cells) this.data.cells[id] = value;
+            this.config.onFieldValueChange?.(id, value);
+          },
+          {
+            schema: fieldSchema,
+            placeholder: this.data.label ?? token.dataset.placeholder,
+            currentValue: readTokenValue(token),
+          },
+        );
+      },
+      onDeleteField: (fieldId: any, token: any) => this.config.onDeleteField?.(fieldId, token),
+    });
 
     return this.wrapper;
   }
@@ -151,15 +170,18 @@ export default class TemplateBlock {
       e.stopPropagation();
       const fieldSchema = getRegistryFromConfig(this.config)?.getFieldSchemas()?.[this.data.fieldId];
       if (!isFieldEditableInFillMode(fieldSchema)) return;
-      token.classList.add('field-token--active');
-      try {
-        const next = await openFieldPicker(this.data.fieldId, readTokenValue(token), this.config);
-        updateFieldToken(token, next, fieldLabel);
-        this.data.value = next;
-      } catch { /* cancelled */ }
-      finally {
-        token.classList.remove('field-token--active');
-      }
+      await pickFillFieldFromToken(
+        token,
+        this.config,
+        (_id: any, next: any) => {
+          this.data.value = next;
+        },
+        {
+          schema: fieldSchema,
+          placeholder: fieldLabel,
+          currentValue: readTokenValue(token),
+        },
+      );
     });
     wrap.appendChild(token);
     return wrap;
@@ -221,15 +243,18 @@ export default class TemplateBlock {
       const fieldId = this.data.fieldId;
       const fieldSchema = getRegistryFromConfig(this.config)?.getFieldSchemas()?.[fieldId];
       if (!isFieldEditableInFillMode(fieldSchema)) return;
-      token.classList.add('field-token--active');
-      try {
-        const next = await openFieldPicker(fieldId, readTokenValue(token), this.config);
-        updateFieldToken(token, next, this.data.label);
-        this.data.value = next;
-      } catch { /* cancelled */ }
-      finally {
-        token.classList.remove('field-token--active');
-      }
+      await pickFillFieldFromToken(
+        token,
+        this.config,
+        (_id: any, next: any) => {
+          this.data.value = next;
+        },
+        {
+          schema: fieldSchema,
+          placeholder: this.data.label,
+          currentValue: readTokenValue(token),
+        },
+      );
     });
   }
 

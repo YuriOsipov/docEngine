@@ -120,6 +120,25 @@ describe('formula-field-picker', () => {
     assert.equal(textarea.value, 'sum({Products.Line Items.Total})');
   });
 
+  it('shows overlay formula functions in the wrap row', () => {
+    const { document } = setupDom();
+    const host = document.createElement('div');
+    document.body.append(host);
+
+    renderFormulaFieldPicker(host, {
+      blocks: [],
+      fieldSchemas: {},
+      formulaFunctions: [
+        { name: 'round', impl: () => 0, label: 'round' },
+      ],
+    });
+
+    const roundBtn = [...host.querySelectorAll('.formula-field-picker__fn')].find(
+      (el) => el.textContent === 'round',
+    );
+    assert.ok(roundBtn);
+  });
+
   it('insertIntoTextarea and wrapSelectionWithFunction helpers stay consistent', () => {
     setupDom();
     const textarea = {

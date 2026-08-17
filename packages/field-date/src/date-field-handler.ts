@@ -1,4 +1,5 @@
-import type { DateFieldSchema, FieldHandler, FieldSchema } from '@docengine/editor';
+/** Types-only entry so this plugin can compile before `@docengine/editor` lib/ is built. */
+import type { DateFieldSchema, FieldHandler, FieldSchema } from '@docengine/editor/types';
 import {
   formatDateValue,
   applyCustomDatePattern,

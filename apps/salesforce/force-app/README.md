@@ -78,10 +78,10 @@ Optional overrides: `c__templateId`, `c__fill=0`, `c__export=html`, `c__preview=
 ## PDF (P4)
 
 1. Default: **Salesforce** HTML→PDF (`Blob.toPdf`) — no external host (Use External PDF unchecked).
-2. Optional: check Custom Setting **DocEngine Settings → Use External PDF**, run/deploy `apps/pdf-service` HTTPS, point Named Credential `DocEngine_Pdf`.
+2. Optional: check Custom Setting **DocEngine Settings → Use External PDF**, point Named Credential `DocEngine_Pdf` at **your** HTTPS host — typically **n8n** + `n8n-nodes-docengine` (Webhook → DocEngine → PDF). Alternative: `apps/pdf-service`.
 3. On `docEngineFiller`, use **Save + PDF**.
 
-See [integrations/salesforce/PDF.md](../../../integrations/salesforce/PDF.md) and [LWS.md](../../../integrations/salesforce/LWS.md).
+See [integrations/salesforce/PDF.md](../../../integrations/salesforce/PDF.md) (BYO section) and [LWS.md](../../../integrations/salesforce/LWS.md).
 
 ## Permission sets
 

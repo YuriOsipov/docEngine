@@ -27,7 +27,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --pretty false",
     "prepare": "npm run build",
-    "test": "npm run build && node --test dist/date-field.test.js"
+    "test": "npm run build && node --test dist/date-field.test.js dist/date-modal.test.js"
   },
   "devDependencies": {
     "linkedom": "^0.18.12"

@@ -42,7 +42,7 @@ createEditor({
 |--------|------|
 | `dateFieldHandler` | Full `FieldHandler` (`type: 'date'`) |
 | `registerDateField({ registerField })` | Registers the handler |
-| `createDateModal()` | Fill-mode `<input type="date">` modal |
+| `createDateModal()` | Fill-mode `<input type="date">` modal (uses `@docengine/editor/ui/field-form-modal`) |
 | `createDatePickerCallbacks()` | `{ openDatePicker }` for `createEditor({ pickers })` |
 
 Handler capabilities:

@@ -17,7 +17,8 @@ import {
   createDocEditor,
   resolveCreateDocEditorOptions,
   emptyDocument,
-  parseJsonSafe
+  parseJsonSafe,
+  apexErrorMessage
 } from 'c/docEngineLib';
 
 export default class DocEngineTemplateBuilder extends LightningElement {
@@ -138,6 +139,7 @@ export default class DocEngineTemplateBuilder extends LightningElement {
           documentActionsContainer: docActions,
           designMode: true,
           data: initialData,
+          recordId: this.recordId,
           ui: { designLayout: 'panels' },
           resolveListItems: this._resolveListItems.bind(this),
           remoteListCollections: this._remoteListCollections.bind(this),
@@ -629,7 +631,7 @@ export default class DocEngineTemplateBuilder extends LightningElement {
   }
 
   _showError(title, err) {
-    const message = (err && (err.body && err.body.message)) || (err && err.message) || String(err);
+    const message = apexErrorMessage(err);
     this.dispatchEvent(new ShowToastEvent({ title, message, variant: 'error', mode: 'sticky' }));
   }
 }

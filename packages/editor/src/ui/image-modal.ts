@@ -1,5 +1,13 @@
-import { uploadByFile, uploadByUrl, normalizeImageValue, createEmptyImageValue } from '../services/image-upload.js';
+import {
+  uploadByFile,
+  uploadByUrl,
+  normalizeImageValue,
+  createEmptyImageValue,
+  canListExistingImages,
+} from '../services/image-upload.js';
+import { createExistingImageModal } from './existing-image-modal.js';
 import { wireModalEscape } from './wire-modal-escape.js';
+import { FIELD_PICKER_POSITION_COOKIE, wireModalMove } from './wire-modal-move.js';
 import {
   FIELD_MODAL_FOOTER_HINT_HTML,
   FIELD_MODAL_OVERLAY_CLASS,
@@ -18,6 +26,9 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
       <div class="modal__body image-modal">
         <div class="image-modal__preview" data-role="preview" hidden>
           <img alt="" data-role="preview-img" />
+        </div>
+        <div class="schema-form__row image-modal__browse-row" data-role="browse-row" hidden>
+          <button type="button" class="btn" data-action="browse">Choose from Salesforce Files…</button>
         </div>
         <label class="schema-form__row">
           <span>Upload file</span>
@@ -45,9 +56,16 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
 
   mountFieldModalOverlay(overlay, parent);
 
+  const modalRoot = overlay.querySelector('.modal') as HTMLElement | null;
+  if (modalRoot) wireModalMove(modalRoot, { cookieKey: FIELD_PICKER_POSITION_COOKIE });
+
+  const browseModal = createExistingImageModal({ parent });
+
   const header = overlay.querySelector('.modal__header');
   const preview = overlay.querySelector('[data-role="preview"]');
   const previewImg = overlay.querySelector('[data-role="preview-img"]');
+  const browseRow = overlay.querySelector('[data-role="browse-row"]');
+  const btnBrowse = overlay.querySelector('[data-action="browse"]');
   const fileInput = overlay.querySelector('[data-role="file"]');
   const urlInput = overlay.querySelector('[data-role="url"]');
   const captionInput = overlay.querySelector('[data-role="caption"]');
@@ -60,7 +78,6 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
   let resolvePromise: any = null;
   let rejectPromise: any = null;
   let _currentValue = createEmptyImageValue();
-  
   let pendingUrl = '';
 
   function close() {
@@ -95,6 +112,31 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
     captionInput.value = normalized.caption ?? '';
     urlInput.value = '';
     updatePreview(normalized.url);
+  }
+
+  async function openBrowseModal() {
+    showError('');
+    statusEl.textContent = '';
+    btnBrowse.disabled = true;
+    try {
+      const picked = (await browseModal.open()) as {
+        url: string;
+        previewUrl?: string;
+        name?: string;
+      };
+      pendingUrl = picked.url;
+      _currentValue = { url: pendingUrl, caption: captionInput.value.trim() };
+      updatePreview(picked.previewUrl || picked.url);
+      statusEl.textContent = picked.name ? `Selected: ${picked.name}` : 'File selected.';
+      fileInput.value = '';
+      urlInput.value = '';
+    } catch (err: any) {
+      if (err?.message !== 'cancelled') {
+        showError(err?.message ?? 'Could not use selected File');
+      }
+    } finally {
+      btnBrowse.disabled = false;
+    }
   }
 
   async function uploadSelectedFile() {
@@ -169,11 +211,12 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
   }
 
   function open({ title, value = null }: any) {
-    return new Promise((resolve: any,reject: any) => {
+    return new Promise((resolve: any, reject: any) => {
       resolvePromise = resolve;
       rejectPromise = reject;
       header.textContent = title;
       setFormFromValue(value);
+      browseRow.hidden = !canListExistingImages();
       mountFieldModalOverlay(overlay, parent);
       overlay.hidden = false;
       captionInput.focus();
@@ -188,6 +231,7 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
     }
   });
 
+  btnBrowse.addEventListener('click', () => openBrowseModal());
   btnOk.addEventListener('click', () => submit());
 
   btnClear.addEventListener('click', () => {
@@ -210,7 +254,11 @@ export function createImageModal({ parent = null }: { parent?: HTMLElement | nul
   });
 
   wireModalConfirmShortcut(overlay, btnOk);
-  wireModalEscape(overlay, () => btnClose.click());
+  wireModalEscape(overlay, () => {
+    // Browse overlay owns Escape while it is open.
+    if (document.querySelector('.image-files-modal-overlay:not([hidden])')) return;
+    if (!overlay.hidden) btnClose.click();
+  });
 
   return { open };
 }

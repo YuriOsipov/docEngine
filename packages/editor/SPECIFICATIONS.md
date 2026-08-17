@@ -10,7 +10,9 @@ This document defines every public contract of the library: factory options, ins
 
 | Import | Purpose |
 |--------|---------|
-| `@docengine/editor` | Factory, utilities, registry, types |
+| `@docengine/editor` | Factory, utilities, field registry, formula registry, types |
+| `@docengine/editor/node` | Headless / n8n subset (document I/O, `evaluateComputedField`, `registerFormulaFunction`) |
+| `@docengine/engine` | Headless core: I/O, mapping, formula evaluation and function registry |
 | `@docengine/editor/styles.css` | Editor UI styles (modals, tokens, blocks, toolbar) |
 
 **Peer dependency:** `@editorjs/editorjs ^2.30.8`
@@ -52,6 +54,14 @@ interface CreateEditorOptions {
 
   /** Image upload configuration (global for this editor instance). */
   imageUpload?: ImageUploadConfig;
+
+  /**
+   * Extra computed-formula functions (add or override built-ins). See §5.5 and §14.3.
+   * Same as `registerFormulaFunction` before createEditor — writes the process-wide
+   * engine registry, not a per-instance evaluator. Headless hosts (n8n, PDF) must
+   * register the same functions or formulas will error at render time.
+   */
+  formulaFunctions?: FormulaFunctionDef[];
 
   /** Override built-in field picker modals (partial override allowed). */
   pickers?: Partial<PickerCallbacks>;
@@ -116,6 +126,12 @@ interface CreateEditorUiOptions {
   pdfFilename?: string;
   /** Optional title prepended in PDF exports. */
   pdfTitle?: string;
+
+  /**
+   * Underline / highlight empty fields in fill mode (`.editor-holder--show-fields`).
+   * Default: true. Focus ring (`.field-token--focused`) is independent — see §10.1.
+   */
+  showFieldsInFillMode?: boolean;
 }
 ```
 
@@ -151,6 +167,10 @@ interface DocEditorInstance {
   /** Toggle design vs fill mode (re-inits editor, preserves document). */
   setDesignMode(enabled: boolean): Promise<void>;
   getDesignMode(): boolean;
+
+  /** Toggle empty-field underlines in fill mode (see §10.1). */
+  setShowFieldsInFillMode(enabled: boolean): void;
+  getShowFieldsInFillMode(): boolean;
 
   /** Open read-only preview modal. */
   preview(): Promise<void>;
@@ -201,6 +221,14 @@ interface DocumentSectionData {
   label?: string;
   /** When true, section body is hidden in the editor (persisted in document/template). */
   collapsed?: boolean;
+  /** When true, this section's content becomes the PDF page header on every page. */
+  repeatable?: boolean;
+  /** When true, the section title is omitted from document preview (and preview-first PDF). */
+  hideTitleInPreview?: boolean;
+  /** When true, draw a horizontal rule above the section (editor + preview/PDF). */
+  borderTop?: boolean;
+  /** When true, draw a horizontal rule below the section (editor + preview/PDF). */
+  borderBottom?: boolean;
   segments: Segment[];
   fieldValues: Record<string, FieldValue>;
 }
@@ -235,6 +263,7 @@ type TextAlign = 'left' | 'center' | 'right';
 - `label` — shown in preview whenever non-empty, even when all fields in the section are empty
 - `name` — stable Section Name for document export (`sections` keys) and field ID prefix; defaults to `label` when omitted
 - `collapsed` — editor-only; preview always shows available body content expanded (no collapse control)
+- `borderTop` / `borderBottom` — optional horizontal rules above/below the section in editor, preview, and PDF
 
 #### `templateBlock`
 
@@ -585,10 +614,15 @@ Cell field IDs: `cellFieldId(tableId, rowKey, colKey)` → `{tableId}_{rowKey}_{
 ```ts
 interface ComputedFieldSchema extends FieldSchemaBase {
   type: 'computed';
-  formula: string;   // see §5.5
+  formula: string;   // see §5.5 (language + registerFormulaFunction)
+  suffix?: string;
+  displayFormat?: 'plain' | 'number' | 'currency'; // default 'plain'
+  currencyCode?: string; // ISO 4217 when displayFormat is 'currency'; default 'EUR'
+  fractionDigits?: number; // optional; for number/currency display
 }
 ```
 
+Computed results remain unformatted internally. `displayFormat` / `currencyCode` / `fractionDigits` / `suffix` control how the value is shown in the editor, preview, and PDF (via `formatNumericDisplay`) — same as Number fields.
 ### 5.4 Shared catalog types
 
 ```ts
@@ -607,15 +641,123 @@ interface TreeNode {
 
 ### 5.5 Computed formula language
 
+Owned by `@docengine/engine` and re-exported from `@docengine/editor` / `@docengine/editor/node`. Preview, PDF, n8n, and `document-io` all call the same evaluator.
+
 - **Scalar references:** `{Section.FieldName}` — uses section name and field `name` (same keys as document export)
 - **Table column references:** `{Section.TableName.ColumnName}` — all rows in that column; bare reference joins non-empty values with `; `
 - **Legacy references:** `{fieldId}` — internal field ID (still supported)
 - **Quoted segments:** `{Section."Name.With.Dots"}` when a name contains `.`
-- **Functions:** `concat(a, b, …)`, `age(dateField)`, `sum(ref)`, `avg(ref)`, `min(ref)`, `max(ref)`, `count(ref)` — aggregates take one field/column reference
 - **Operators:** `+`, `-`, `*`, `/` (numeric `+` when both operands are numeric; otherwise string concatenation for `+`)
 - **Cycle detection:** circular references are blocked on save and shown as errors at runtime
+- **Unknown function / syntax / type errors:** evaluation returns `{ value: '—', error: string }` (display shows an em dash)
 
-**Internals:** `evaluateComputedField(fieldId, valuesMap, fieldSchemas, { blocks })` — `blocks` required for dot-path resolution; `extractFormulaDependencyFieldIds(formula, blocks, fieldSchemas)` resolves transitive cell dependencies for table columns.
+Templates store **only** the formula string on `ComputedFieldSchema.formula`. Function implementations are never serialized. Hosts register code via the function registry (§5.5.4, §14.3).
+
+#### 5.5.1 Built-in functions
+
+| Name | Kind | Arity | Behavior |
+|------|------|-------|----------|
+| `concat(a, b, …)` | scalar | any | Join arguments as strings (`null`/`undefined` → `''`) |
+| `age(date)` | scalar | 1 | Whole years from an ISO date (`YYYY-MM-DD`) to today; empty input → `''`; invalid date errors |
+| `sum(ref)` | aggregate | one `{Field}` | Sum of numeric non-empty values; no numerics → `''` |
+| `avg(ref)` | aggregate | one `{Field}` | Average of numeric non-empty values; no numerics → `''` |
+| `min(ref)` | aggregate | one `{Field}` | Minimum numeric value; no numerics → `''` |
+| `max(ref)` | aggregate | one `{Field}` | Maximum numeric value; no numerics → `''` |
+| `count(ref)` | aggregate | one `{Field}` | Count of non-empty values |
+
+Aggregates take **one field or column reference**, not a comma-separated expression list: `sum({Examination.Labs.Value})`.
+
+Numeric results are formatted with at most 3 decimal places. Integers stay unpadded.
+
+#### 5.5.2 Evaluation APIs
+
+```ts
+evaluateFormula(formula, values, fieldSchemas, options?: {
+  evaluating?: Iterable<string>;
+  selfId?: string;
+  blocks?: EditorBlock[];           // required for {Section.Field} / column paths
+  formulaFunctions?: FormulaFunctionDef[];  // per-call overlay, see §5.5.4
+}): { value: string; error: string | null }
+
+evaluateComputedField(fieldId, values, fieldSchemas, options?: {
+  blocks?: EditorBlock[];
+  formulaFunctions?: FormulaFunctionDef[];
+}): { value: string; error: string | null }
+
+extractFormulaDependencies(formula): string[]
+extractFormulaDependencyFieldIds(formula, blocks, fieldSchemas): string[]
+detectCircularDependency(fieldId, formula, fieldSchemas, blocks?): boolean
+```
+
+Nested computed fields (a formula that references another computed field) reuse the same `formulaFunctions` overlay and process registry.
+
+Exported from `@docengine/engine`. `@docengine/editor` and `@docengine/editor/node` re-export `evaluateComputedField` plus the registry helpers (`registerFormulaFunction`, `unregisterFormulaFunction`, `listFormulaFunctions`, …). `evaluateFormula` is the engine primitive; editor hosts typically call `evaluateComputedField`.
+
+#### 5.5.3 `FormulaFunctionDef`
+
+```ts
+type FormulaFunctionKind = 'scalar' | 'aggregate';
+type FormulaFunctionArity = number | { min?: number; max?: number };
+
+interface FormulaFunctionDef {
+  /** Identifier in formulas. Must match `/^[a-zA-Z_][a-zA-Z0-9_]*$/`. */
+  name: string;
+  /**
+   * `aggregate` — one `{Field}` / column reference (like `sum`).
+   * `scalar` (default) — comma-separated expressions (like `concat` / `age`).
+   */
+  kind?: FormulaFunctionKind;
+  /**
+   * Scalar argument count. Omitted = any count.
+   * Not applied to the resolved value array of aggregates (aggregates always take one field ref).
+   */
+  arity?: FormulaFunctionArity;
+  /**
+   * Scalar: evaluated argument values.
+   * Aggregate: resolved cell/field values from the referenced column or field.
+   */
+  impl: (args: unknown[]) => unknown;
+  /** Formula-picker button label. Defaults to `name`. */
+  label?: string;
+  /** Tooltip on the picker wrap button. */
+  description?: string;
+  /** When `false`, omit from the formula picker wrap buttons. Default `true`. */
+  picker?: boolean;
+}
+```
+
+`registerFormulaFunction` throws if `name` is invalid or `impl` is not a function.
+
+Scalar arity errors (wrong argument count) surface as formula `error` strings, e.g. `round() expects 1 argument`.
+
+#### 5.5.4 Function registry
+
+Process-wide table in `@docengine/engine`. Built-ins are always present. Plugin/host entries overlay built-ins by **name** and do not delete them.
+
+```ts
+registerFormulaFunction(def: FormulaFunctionDef): FormulaFunctionDef
+unregisterFormulaFunction(name: string): boolean  // removes host override only; built-in returns
+resetFormulaFunctions(): void                     // drop all host overrides (tests / teardown)
+getFormulaFunction(name, overlay?): FormulaFunctionDef | undefined
+listFormulaFunctions(overlay?): FormulaFunctionDef[]
+listFormulaPickerFunctions(overlay?): FormulaFunctionDef[]  // `picker !== false`
+```
+
+**Lookup order** for a call `fn(...)`:
+
+1. Per-call `options.formulaFunctions` overlay (last matching name wins)
+2. Host/plugin map from `registerFormulaFunction`
+3. Built-in table
+
+`listFormulaFunctions` merges in that same order, then sorts **aggregates first**, then scalars, each group A–Z by `name`.
+
+`createEditor({ formulaFunctions })` calls `registerFormulaFunction` for each def (same process registry — not a second evaluator). See §14.3.
+
+The registry is **process-wide**. Two editors with different function sets in one JS process will share (and overwrite) names. Typical hosts (one Salesforce LWC, one n8n worker) register once at startup.
+
+#### 5.5.5 Designer formula picker
+
+The computed-field properties panel wrap buttons (`Wrap selection:`) come from `listFormulaPickerFunctions()`, including built-ins (`sum`, `concat`, `age`, …) and registered plugins. Pass `formulaFunctions` into `renderFormulaFieldPicker` to preview an overlay without registering globally. `picker: false` hides a function from the wrap row without removing it from evaluation.
 
 
 ### 5.6 Schema utilities
@@ -733,6 +875,8 @@ interface EditorToolConfig {
 
 Override via `createEditor({ pickers: { ... } })`. Each returns a `Promise` resolved on OK, rejected on cancel.
 
+Simple form pickers (text, integer, date, and field plugins) should use `createFieldFormModal()` so they share position, drag, Esc, and Ctrl+Enter. Tree/list keep their own picker shells but use the same `FIELD_PICKER_POSITION_COOKIE`.
+
 ```ts
 interface PickerCallbacks {
   openListPicker(opts: ListPickerOptions): Promise<string | string[]>;
@@ -798,13 +942,15 @@ interface ImageUploadConfig {
 
 **Function:** `configureImageUpload(config: ImageUploadConfig): void`
 
+When `stub` is true (default in Salesforce and demos without `VITE_UPLOAD_BASE_URL`), **Upload file** embeds the image as a `data:` URL in the field value so fill HTML preview, save/reload, and PDF can still render it. Ephemeral `blob:` URLs are not used for the stored value (they break outside the live editor). Prefer a real `uploadUrl` for large images so document JSON stays small.
+
 **Upload API response** (server):
 
 ```json
 { "success": 1, "file": { "url": "https://..." } }
 ```
 
-**Helpers:** `uploadByFile(file)`, `uploadByUrl(url)`, `normalizeImageValue(value)`, `createEmptyImageValue()`, `isImageValueEmpty(value)`
+**Helpers:** `uploadByFile(file)`, `uploadByUrl(url)`, `fileToDataUrl(file)`, `normalizeImageValue(value)`, `createEmptyImageValue()`, `isImageValueEmpty(value)`
 
 ---
 
@@ -832,6 +978,39 @@ When design mode is on:
 - Column widths are edited in the properties panel when the columns toolbar is selected (presets or custom CSS grid track sizes)
 - Nested columns are supported inside either column
 - Field clipboard (copy/cut/paste) works inside column editables
+
+### 10.1 Fill mode — keyboard field navigation
+
+When `designMode` is **false** (fill / run mode), end users enter values through field picker dialogs. In addition to click-to-edit, the editor supports keyboard traversal between editable fields.
+
+#### Behavior
+
+| Input | Action |
+|-------|--------|
+| **Click** field token | Set fill focus + open value picker |
+| **Tab** | Move fill focus to the next editable field (document order) |
+| **Shift+Tab** | Move fill focus to the previous editable field |
+| **Enter** or **Space** (focused field) | Open the same value picker as click |
+| Picker **OK** / **Cancel** | Close dialog; restore focus ring + caret on the same field so Tab can continue |
+
+- Traversal includes **inline prose tokens** and **table cell** tokens, across document sections.
+- **Skipped:** computed fields, `readonly` fields, and handlers with `editableInFill: false`.
+- **Ignored** while a `.modal-overlay:not([hidden])` is open (picker / schema modals keep their own keyboard handling).
+- At the first/last editable field, Tab / Shift+Tab **stay** on that field (no wrap).
+- With no current focus, Tab focuses the first editable field; Shift+Tab focuses the last.
+
+#### Focus vs design selection
+
+| Class | Mode | Role |
+|-------|------|------|
+| `.field-token--focused` | Fill | Current keyboard / click target (persistent after picker closes) |
+| `.field-token--active` | Fill | Temporary outline while the value picker is open |
+| `.field-token--selected` | Design | Schema selection / properties / clipboard — **not** used in fill mode |
+
+#### Related UI
+
+- `ui.showFieldsInFillMode` (default `true`) and `setShowFieldsInFillMode` / `getShowFieldsInFillMode` control empty-field underlines via `.editor-holder--show-fields`. The **focus ring** (`.field-token--focused`) remains visible even when show-fields is off.
+- Outline color: `var(--me-field-active-outline)`.
 
 ---
 
@@ -903,6 +1082,7 @@ For custom tools or host integration:
 | `updateFieldToken(token, value, placeholder?)` | Refresh token display |
 | `readTokenValue(token)` | Read value from token DOM |
 | `openFieldPicker(fieldId, currentValue, callbacks)` | Open appropriate picker |
+| `pickFillFieldFromToken(token, callbacks, onUpdate?, options?)` | Fill-mode activate: focus + picker + update (used by click and keyboard) |
 | `showNotification(message, { type?, durationMs? })` | Toast (`type`: `'error'` \| `'status'`) |
 
 ---
@@ -1013,7 +1193,7 @@ That gives you: palette entry, default schema, designer extras, empty/default va
 
 Point `picker` at one of these in `toDisplayConfig` / `toPickerConfig`. Fully custom pickers can also be supplied via `createEditor({ pickers: ... })`.
 
-Built-ins `text`, `integer`, and `image` implement designer + display + PDF hooks in `@docengine/editor`. Complex types (`list`, `choice`, `tree`, `table`, `child`, `computed`) still use legacy designer forms in the schema editor.
+Built-ins `text`, `integer`, and `image` implement designer + display + PDF hooks in `@docengine/editor`. `computed` implements display-format designer hooks (appended after the formula UI) plus `formatDisplay`. Complex types (`list`, `choice`, `tree`, `table`, `child`) still use legacy designer forms in the schema editor.
 
 **`date` is not a core built-in.** Hosts must install and register `@docengine/field-date` (the reference field plugin).
 
@@ -1041,6 +1221,81 @@ Without registration, existing documents that already contain `type: 'date'` sch
 
 See `packages/field-date/README.md` for the full copy-this-pattern guide.
 
+### 14.3 Formula function plugins
+
+Computed fields stay `type: 'computed'`. Plugins extend the **formula language** (§5.5), not the field-type catalog (§14.1).
+
+Do **not** store JavaScript in template / document JSON. Register implementations in the host process; formulas only contain names like `round({Section.Weight})`.
+
+**Simplest path:** call `registerFormulaFunction` before `createEditor` (and before any headless `evaluateComputedField` / `renderDocument` / PDF). The same registration is required in every process that evaluates the formula (editor, n8n node, pdf-service). Without it, evaluation returns `Unknown function: round`.
+
+```js
+import { registerFormulaFunction, createEditor } from '@docengine/editor';
+// Headless: import { registerFormulaFunction } from '@docengine/engine';
+
+registerFormulaFunction({
+  name: 'round',
+  arity: 1,
+  label: 'round',
+  description: 'Round to nearest integer',
+  impl: ([value]) => Math.round(Number(value)),
+});
+
+registerFormulaFunction({
+  name: 'product',
+  kind: 'aggregate',
+  description: 'Product of numeric column values',
+  impl: (values) => {
+    const nums = values.map(Number).filter((n) => !Number.isNaN(n));
+    return nums.length ? nums.reduce((a, b) => a * b, 1) : '';
+  },
+});
+
+createEditor({
+  holder: document.getElementById('editor'),
+  // Optional shortcut: same registry as registerFormulaFunction (add or override by name)
+  formulaFunctions: [
+    {
+      name: 'ifEmpty',
+      arity: 2,
+      impl: ([value, fallback]) => (value == null || value === '' ? fallback : value),
+    },
+  ],
+});
+```
+
+#### Required vs optional (`FormulaFunctionDef`)
+
+| Property | Role |
+|----------|------|
+| `name` | Identifier in formulas (`/^[a-zA-Z_][a-zA-Z0-9_]*$/`) |
+| `impl` | Implementation. Scalar: evaluated args. Aggregate: resolved field/column values |
+| `kind` | `'scalar'` (default) or `'aggregate'` (one `{Field}` ref, like `sum`) |
+| `arity` | Scalar argument count (`number` or `{ min, max }`). Ignored for aggregate value arrays |
+| `label` | Picker wrap-button text (default: `name`) |
+| `description` | Picker tooltip |
+| `picker` | `false` hides the wrap button; function still evaluates |
+
+#### Host rules
+
+| Without this | Result |
+|--------------|--------|
+| No `registerFormulaFunction` / `formulaFunctions` for a custom name | Formula error `Unknown function: <name>` in fill, preview, PDF, n8n |
+| Register only in the editor | PDF / n8n / `document-io` still fail — they evaluate in `@docengine/engine` |
+| `createEditor({ formulaFunctions })` only | Registers onto the **process** registry (same as the plugin API). Not instance-isolated |
+| Override a built-in name (`concat`, `sum`, …) | Host `impl` wins until `unregisterFormulaFunction(name)` restores the built-in |
+
+Per-call overlay (does not mutate the process registry):
+
+```js
+evaluateFormula('ifEmpty({n}, "n/a")', values, schemas, {
+  blocks,
+  formulaFunctions: [{ name: 'ifEmpty', arity: 2, impl: ([v, f]) => v || f }],
+});
+```
+
+A later `registerFormulaFunction` with the same `name` replaces the previous host impl. `resetFormulaFunctions()` clears all host overrides (built-ins remain); intended for tests and host teardown.
+
 ---
 
 ## 15. CSS contract
@@ -1051,7 +1306,12 @@ Import `@docengine/editor/styles.css`. Key classes host apps should not override
 |-------|------|
 | `.field-token` | Inline field chip |
 | `.field-token--image` | Image field block layout |
+| `.field-token--focused` | Fill-mode current field (keyboard / click target) |
+| `.field-token--active` | Fill-mode field while value picker is open |
+| `.field-token--selected` | Design-mode selection |
+| `.editor-holder--show-fields` | Fill-mode empty-field underline highlights |
 | `.document-section__header` | Section title (label input in design mode) |
+| `.document-section--border-top` / `--border-bottom` | Optional horizontal rules on the section wrapper |
 | `.document-section__body` | Contenteditable prose |
 | `.document-align--{left\|center\|right}` | Text/image alignment wrapper |
 | `.field-palette` | Add-block bar (visible in design mode) |

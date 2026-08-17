@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { parseHTML } from 'linkedom';
-import type { DateFieldSchema, FieldHandler } from '@docengine/editor';
+import type { DateFieldSchema, FieldHandler } from '@docengine/editor/types';
 import {
   dateFieldHandler,
   formatDateValue,

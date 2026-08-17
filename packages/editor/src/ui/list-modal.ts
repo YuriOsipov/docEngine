@@ -1,5 +1,6 @@
 import { wireModalEscape } from './wire-modal-escape.js';
 import { wireModalResize } from './wire-modal-resize.js';
+import { FIELD_PICKER_POSITION_COOKIE, wireModalMove } from './wire-modal-move.js';
 import {
   FIELD_PICKER_FOOTER_HINT_HTML,
   FIELD_MODAL_OVERLAY_CLASS,
@@ -93,6 +94,7 @@ export function createListModal({ parent = null }: { parent?: HTMLElement | null
 
   const modalEl = overlay.querySelector('.modal');
   wireModalResize(modalEl, { cookieKey: 'list-picker' });
+  wireModalMove(modalEl, { cookieKey: FIELD_PICKER_POSITION_COOKIE });
 
   const header = overlay.querySelector('.modal__header');
   const searchInput = overlay.querySelector('.modal__search');

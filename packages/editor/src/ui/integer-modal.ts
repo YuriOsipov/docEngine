@@ -1,136 +1,76 @@
-import { wireModalEscape } from './wire-modal-escape.js';
-import {
-  FIELD_MODAL_FOOTER_HINT_HTML,
-  FIELD_MODAL_OVERLAY_CLASS,
-  mountFieldModalOverlay,
-  wireFieldModalFocus,
-  wireModalConfirmShortcut,
-} from './wire-modal-palette.js';
+import { createFieldFormModal } from './field-form-modal.js';
 
 export function createIntegerModal({ parent = null }: { parent?: HTMLElement | null } = {}) {
-  const overlay = document.createElement('div');
-  overlay.className = FIELD_MODAL_OVERLAY_CLASS;
-  overlay.hidden = true;
-
-  overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal__header"></div>
-      <div class="modal__body">
-        <p class="modal__hint" data-role="hint"></p>
-        <input type="number" class="modal__number" inputmode="numeric" />
-        <p class="modal__error" data-role="error" hidden></p>
-      </div>
-      <div class="modal__footer">
-        <button type="button" class="btn" data-action="clear">Clear</button>
-        <button type="button" class="btn btn-primary" data-action="ok">OK</button>
-        ${FIELD_MODAL_FOOTER_HINT_HTML}
-        <button type="button" class="btn" data-action="close">Close</button>
-      </div>
-    </div>
-  `;
-
-  mountFieldModalOverlay(overlay, parent);
-
-  const header = overlay.querySelector('.modal__header') as HTMLElement;
-  const hint = overlay.querySelector('[data-role="hint"]') as HTMLElement;
-  const input = overlay.querySelector('.modal__number') as HTMLInputElement;
-  const error = overlay.querySelector('[data-role="error"]') as HTMLElement;
-  const btnClear = overlay.querySelector('[data-action="clear"]') as HTMLButtonElement;
-  const btnOk = overlay.querySelector('[data-action="ok"]') as HTMLButtonElement;
-  const btnClose = overlay.querySelector('[data-action="close"]') as HTMLButtonElement;
-
-  let resolvePromise: any = null;
-  let rejectPromise: any = null;
   let currentMin = 0;
   let currentMax = 999;
-  let fallbackValue = '';
-  let releaseFocus: (() => void) | null = null;
 
-  function close() {
-    releaseFocus?.();
-    releaseFocus = null;
-    overlay.hidden = true;
-    input.value = '';
-    error.hidden = true;
-    error.textContent = '';
-  }
-
-  function clampValue(raw: any) {
+  function clampValue(raw: unknown) {
     if (raw === '' || raw == null) return '';
     const num = Number(raw);
     if (Number.isNaN(num)) return null;
     return String(Math.min(currentMax, Math.max(currentMin, num)));
   }
 
-  function showError(message: any) {
-    error.textContent = message;
-    error.hidden = false;
-  }
-
-  function submit() {
-    const result = clampValue(input.value.trim());
-    if (result === null) {
-      showError(`Enter a number from ${currentMin} to ${currentMax}.`);
-      input.focus();
-      return;
-    }
-    const resolve = resolvePromise;
-    close();
-    resolve?.(result);
-    resolvePromise = null;
-    rejectPromise = null;
-  }
-
-  function open({ title, value = '', min = 0, max = 999 }: any) {
-    return new Promise((resolve: any, reject: any) => {
-      resolvePromise = resolve;
-      rejectPromise = reject;
-      currentMin = min;
-      currentMax = max;
-      fallbackValue = value != null && value !== '' ? String(value) : '';
-
-      mountFieldModalOverlay(overlay, parent);
-      header.textContent = title;
-      hint.textContent = `Enter a value from ${min} to ${max}.`;
-      input.min = String(min);
-      input.max = String(max);
-      input.value = fallbackValue;
-      error.hidden = true;
-      overlay.hidden = false;
-      releaseFocus = wireFieldModalFocus(overlay, input, { selectAll: true });
-    });
-  }
-
-  btnOk.addEventListener('click', () => submit());
-
-  btnClear.addEventListener('click', () => {
-    const resolve = resolvePromise;
-    close();
-    resolve?.('');
-    resolvePromise = null;
-    rejectPromise = null;
+  const form = createFieldFormModal<{
+    title?: string;
+    value?: string;
+    min?: number;
+    max?: number;
+    parent?: HTMLElement | null;
+  }>({
+    parent,
+    bodyHtml: `
+      <p class="modal__hint" data-role="hint"></p>
+      <input type="number" class="modal__number" inputmode="numeric" />
+      <p class="modal__error" data-role="error" hidden></p>
+    `,
+    focusSelector: '.modal__number',
+    selectAll: true,
+    getValue: ({ body }) => {
+      const input = body.querySelector('.modal__number') as HTMLInputElement | null;
+      return input?.value.trim() ?? '';
+    },
+    validate: ({ body }, raw) => {
+      const result = clampValue(raw);
+      if (result === null) {
+        const error = body.querySelector('[data-role="error"]') as HTMLElement | null;
+        const input = body.querySelector('.modal__number') as HTMLInputElement | null;
+        if (error) {
+          error.textContent = `Enter a number from ${currentMin} to ${currentMax}.`;
+          error.hidden = false;
+        }
+        input?.focus();
+        return null;
+      }
+      return result;
+    },
+    onOpen: ({ body }, opts) => {
+      currentMin = opts.min ?? 0;
+      currentMax = opts.max ?? 999;
+      const hint = body.querySelector('[data-role="hint"]') as HTMLElement | null;
+      const input = body.querySelector('.modal__number') as HTMLInputElement | null;
+      const error = body.querySelector('[data-role="error"]') as HTMLElement | null;
+      if (hint) hint.textContent = `Enter a value from ${currentMin} to ${currentMax}.`;
+      if (input) {
+        input.min = String(currentMin);
+        input.max = String(currentMax);
+        input.value = opts.value != null && opts.value !== '' ? String(opts.value) : '';
+      }
+      if (error) {
+        error.hidden = true;
+        error.textContent = '';
+      }
+    },
+    onClose: ({ body }) => {
+      const input = body.querySelector('.modal__number') as HTMLInputElement | null;
+      const error = body.querySelector('[data-role="error"]') as HTMLElement | null;
+      if (input) input.value = '';
+      if (error) {
+        error.hidden = true;
+        error.textContent = '';
+      }
+    },
   });
 
-  btnClose.addEventListener('click', () => {
-    rejectPromise?.(new Error('cancelled'));
-    resolvePromise = null;
-    rejectPromise = null;
-    close();
-  });
-
-  overlay.addEventListener('click', (e: any) => {
-    if (e.target === overlay) btnClose.click();
-  });
-
-  input.addEventListener('keydown', (e: any) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      submit();
-    }
-  });
-
-  wireModalConfirmShortcut(overlay, btnOk);
-  wireModalEscape(overlay, () => btnClose.click());
-
-  return { open };
+  return { open: form.open };
 }

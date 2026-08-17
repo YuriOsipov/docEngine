@@ -4,8 +4,24 @@ import {
   resolveFormulaReference,
 } from './formula-field-index.js';
 import type { EditorBlock, FieldSchema } from '../types.js';
+import {
+  getFormulaFunction,
+  invokeFormulaFunction,
+  type FormulaFunctionDef,
+} from './formula-functions.js';
 
 export { extractFormulaDependencyFieldIds } from './formula-field-index.js';
+export {
+  registerFormulaFunction,
+  unregisterFormulaFunction,
+  resetFormulaFunctions,
+  getFormulaFunction,
+  listFormulaFunctions,
+  listFormulaPickerFunctions,
+  type FormulaFunctionDef,
+  type FormulaFunctionKind,
+  type FormulaFunctionArity,
+} from './formula-functions.js';
 
 type FieldSchemaMap = Record<string, FieldSchema>;
 type ValueMap = Record<string, unknown>;
@@ -23,10 +39,20 @@ type Token =
 
 type FormulaResult = { value: string; error: string | null };
 
+type FormulaRuntime = {
+  values: ValueMap;
+  fieldSchemas: FieldSchemaMap;
+  evaluating: Set<string>;
+  blocks: EditorBlock[];
+  formulaFunctions?: FormulaFunctionDef[];
+};
+
 type EvaluateOptions = {
   evaluating?: Iterable<string>;
   selfId?: string;
   blocks?: EditorBlock[];
+  /** Per-call overlay; merged on top of built-ins and registerFormulaFunction. */
+  formulaFunctions?: FormulaFunctionDef[];
 };
 
 /** Raw reference strings inside `{…}` braces (field IDs or dot paths). */
@@ -93,123 +119,50 @@ function formatResult(value: unknown): string {
   return String(value);
 }
 
-function ageFromIsoDate(value: unknown): number | string {
-  const str = String(value ?? '').trim();
-  if (!str) return '';
-  const date = new Date(`${str}T00:00:00`);
-  if (Number.isNaN(date.getTime())) throw new Error('Invalid date for age()');
-  const today = new Date();
-  let years = today.getFullYear() - date.getFullYear();
-  const monthDiff = today.getMonth() - date.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
-    years -= 1;
-  }
-  return years;
-}
-
-function resolveScalarFieldValue(
-  fieldId: string,
-  values: ValueMap,
-  fieldSchemas: FieldSchemaMap,
-  evaluating: Set<string>,
-  blocks: EditorBlock[],
-): unknown {
-  if (evaluating.has(fieldId)) {
+function resolveScalarFieldValue(fieldId: string, runtime: FormulaRuntime): unknown {
+  if (runtime.evaluating.has(fieldId)) {
     throw new Error('Circular reference');
   }
 
-  const schema = fieldSchemas?.[fieldId];
+  const schema = runtime.fieldSchemas?.[fieldId];
   if (schema?.type === 'computed') {
-    evaluating.add(fieldId);
+    runtime.evaluating.add(fieldId);
     try {
       const { value, error } = evaluateFormulaInternal(
         (schema.formula as string | undefined) ?? '',
-        values,
-        fieldSchemas,
-        evaluating,
-        blocks,
+        runtime,
       );
       if (error) throw new Error(error);
       return scalarizeRawValue(value);
     } finally {
-      evaluating.delete(fieldId);
+      runtime.evaluating.delete(fieldId);
     }
   }
 
-  return scalarizeRawValue(values?.[fieldId]);
+  return scalarizeRawValue(runtime.values?.[fieldId]);
 }
 
-function resolveReferenceValues(
-  ref: string,
-  values: ValueMap,
-  fieldSchemas: FieldSchemaMap,
-  evaluating: Set<string>,
-  blocks: EditorBlock[],
-): unknown[] {
-  const resolved = resolveFormulaReference(ref, blocks, fieldSchemas);
+function resolveReferenceValues(ref: string, runtime: FormulaRuntime): unknown[] {
+  const resolved = resolveFormulaReference(ref, runtime.blocks, runtime.fieldSchemas);
 
   if (!resolved) {
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(ref) && fieldSchemas?.[ref]) {
-      return [resolveScalarFieldValue(ref, values, fieldSchemas, evaluating, blocks)];
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(ref) && runtime.fieldSchemas?.[ref]) {
+      return [resolveScalarFieldValue(ref, runtime)];
     }
     throw new Error(`Unknown field reference: ${ref}`);
   }
 
   if (resolved.kind === 'scalar') {
-    return [resolveScalarFieldValue(resolved.fieldId, values, fieldSchemas, evaluating, blocks)];
+    return [resolveScalarFieldValue(resolved.fieldId, runtime)];
   }
 
-  return resolved.cellIds.map((cellId) =>
-    resolveScalarFieldValue(cellId, values, fieldSchemas, evaluating, blocks),
-  );
+  return resolved.cellIds.map((cellId) => resolveScalarFieldValue(cellId, runtime));
 }
 
-function resolveReferenceDisplay(
-  ref: string,
-  values: ValueMap,
-  fieldSchemas: FieldSchemaMap,
-  evaluating: Set<string>,
-  blocks: EditorBlock[],
-): string {
-  const rawValues = resolveReferenceValues(ref, values, fieldSchemas, evaluating, blocks);
+function resolveReferenceDisplay(ref: string, runtime: FormulaRuntime): string {
+  const rawValues = resolveReferenceValues(ref, runtime);
   const nonEmpty = rawValues.filter((value) => value != null && value !== '');
   return nonEmpty.join('; ');
-}
-
-function numericValues(values: unknown[]): number[] {
-  return values
-    .map((value) => String(value ?? '').trim())
-    .filter((value) => value !== '' && !Number.isNaN(Number(value)))
-    .map((value) => Number(value));
-}
-
-function applyAggregate(name: string, values: unknown[]): number | string {
-  const nonEmpty = values.filter((value) => value != null && value !== '');
-
-  if (name === 'count') {
-    return nonEmpty.length;
-  }
-
-  const nums = numericValues(nonEmpty);
-  if (!nums.length) return '';
-
-  if (name === 'sum') {
-    return nums.reduce((total, value) => total + value, 0);
-  }
-
-  if (name === 'avg') {
-    return nums.reduce((total, value) => total + value, 0) / nums.length;
-  }
-
-  if (name === 'min') {
-    return Math.min(...nums);
-  }
-
-  if (name === 'max') {
-    return Math.max(...nums);
-  }
-
-  throw new Error(`Unknown function: ${name}`);
 }
 
 function tokenize(src: string): Token[] {
@@ -290,24 +243,12 @@ function tokenize(src: string): Token[] {
 class Parser {
   tokens: Token[];
   pos: number;
-  values: ValueMap;
-  fieldSchemas: FieldSchemaMap;
-  evaluating: Set<string>;
-  blocks: EditorBlock[];
+  runtime: FormulaRuntime;
 
-  constructor(
-    tokens: Token[],
-    values: ValueMap | null | undefined,
-    fieldSchemas: FieldSchemaMap | null | undefined,
-    evaluating: Set<string> | null | undefined,
-    blocks: EditorBlock[] | null | undefined,
-  ) {
+  constructor(tokens: Token[], runtime: FormulaRuntime) {
     this.tokens = tokens;
     this.pos = 0;
-    this.values = values ?? {};
-    this.fieldSchemas = fieldSchemas ?? {};
-    this.evaluating = evaluating ?? new Set();
-    this.blocks = blocks ?? [];
+    this.runtime = runtime;
   }
 
   peek(): Token {
@@ -379,13 +320,7 @@ class Parser {
 
     if (token.type === 'FIELD') {
       this.pos += 1;
-      return resolveReferenceDisplay(
-        token.value,
-        this.values,
-        this.fieldSchemas,
-        this.evaluating,
-        this.blocks,
-      );
+      return resolveReferenceDisplay(token.value, this.runtime);
     }
 
     if (token.type === 'IDENT') {
@@ -408,23 +343,22 @@ class Parser {
   }
 
   parseCall(name: string): unknown {
+    const def = getFormulaFunction(name, this.runtime.formulaFunctions);
+    if (!def) {
+      throw new Error(`Unknown function: ${name}`);
+    }
+
     this.consume('LPAREN');
 
-    if (['sum', 'avg', 'min', 'max', 'count'].includes(name)) {
+    if ((def.kind ?? 'scalar') === 'aggregate') {
       const token = this.peek();
       if (token.type !== 'FIELD') {
         throw new Error(`${name}() expects a field reference`);
       }
       this.pos += 1;
-      const refValues = resolveReferenceValues(
-        token.value,
-        this.values,
-        this.fieldSchemas,
-        this.evaluating,
-        this.blocks,
-      );
+      const refValues = resolveReferenceValues(token.value, this.runtime);
       this.consume('RPAREN');
-      return applyAggregate(name, refValues);
+      return def.impl(refValues);
     }
 
     const args: unknown[] = [];
@@ -436,17 +370,7 @@ class Parser {
       }
     }
     this.consume('RPAREN');
-
-    if (name === 'concat') {
-      return args.map((arg) => arg ?? '').join('');
-    }
-
-    if (name === 'age') {
-      if (args.length !== 1) throw new Error('age() expects one argument');
-      return ageFromIsoDate(args[0]);
-    }
-
-    throw new Error(`Unknown function: ${name}`);
+    return invokeFormulaFunction(def, args);
   }
 
   parse(): unknown {
@@ -458,16 +382,13 @@ class Parser {
 
 function evaluateFormulaInternal(
   formula: string | null | undefined,
-  values: ValueMap,
-  fieldSchemas: FieldSchemaMap,
-  evaluating: Set<string>,
-  blocks: EditorBlock[],
+  runtime: FormulaRuntime,
 ): FormulaResult {
   if (!formula?.trim()) return { value: '', error: null };
 
   try {
     const tokens = tokenize(formula);
-    const parser = new Parser(tokens, values, fieldSchemas, evaluating, blocks);
+    const parser = new Parser(tokens, runtime);
     const result = parser.parse();
     return { value: formatResult(result), error: null };
   } catch (err) {
@@ -483,25 +404,26 @@ export function evaluateFormula(
 ): FormulaResult {
   const evaluating = new Set(options.evaluating ?? []);
   if (options.selfId) evaluating.add(options.selfId);
-  return evaluateFormulaInternal(
-    formula,
+  return evaluateFormulaInternal(formula, {
     values,
     fieldSchemas,
     evaluating,
-    options.blocks ?? [],
-  );
+    blocks: options.blocks ?? [],
+    formulaFunctions: options.formulaFunctions,
+  });
 }
 
 export function evaluateComputedField(
   fieldId: string,
   values: ValueMap,
   fieldSchemas: FieldSchemaMap,
-  options: { blocks?: EditorBlock[] } = {},
+  options: { blocks?: EditorBlock[]; formulaFunctions?: FormulaFunctionDef[] } = {},
 ): FormulaResult {
   const schema = fieldSchemas?.[fieldId];
   if (!schema || schema.type !== 'computed') return { value: '', error: null };
   return evaluateFormula((schema.formula as string | undefined) ?? '', values, fieldSchemas, {
     selfId: fieldId,
     blocks: options.blocks ?? [],
+    formulaFunctions: options.formulaFunctions,
   });
 }

@@ -6,8 +6,10 @@ import {
   wireDesignDragDrop,
   wireTableRegions,
   syncFillComputedFields,
+  recoverImageValuesFromDom,
   refreshTableCellTokens,
   pruneTableCellCaretAnchors,
+  pickFillFieldFromToken,
 } from '../fields/inline-fields.js';
 import { wireMappingDragDrop } from '../ui/mapping-drag-drop.js';
 import { wireFieldClipboard } from '../fields/field-clipboard.js';
@@ -33,12 +35,21 @@ export default class DocumentSection {
   constructor({ data, config }: any) {
     this.config = config ?? {};
     const label = data.label ?? '';
+    let name = data.name ?? label;
+    if (!String(name ?? '').trim()) {
+      name =
+        typeof this.config.allocateSectionName === 'function'
+          ? this.config.allocateSectionName()
+          : '';
+    }
     this.data = {
-      name: data.name ?? label,
+      name,
       label,
       collapsed: !!data.collapsed,
       repeatable: !!data.repeatable,
       hideTitleInPreview: !!data.hideTitleInPreview,
+      borderTop: !!data.borderTop,
+      borderBottom: !!data.borderBottom,
       visibility: data.visibility ?? null,
       segments: data.segments ?? [],
       fieldValues: data.fieldValues ?? {},
@@ -164,22 +175,42 @@ export default class DocumentSection {
       collapsed: !!this.data.collapsed,
       repeatable: !!this.data.repeatable,
       hideTitleInPreview: !!this.data.hideTitleInPreview,
+      borderTop: !!this.data.borderTop,
+      borderBottom: !!this.data.borderBottom,
       visibility: this.data.visibility ?? null,
       segments: this.data.segments,
       fieldValues: this.data.fieldValues,
     };
   }
 
+  /** Sync border classes on the section wrapper from current data. */
+  applyBorderClasses() {
+    if (!this.wrapper) return;
+    this.wrapper.classList.toggle('document-section--border-top', !!this.data.borderTop);
+    this.wrapper.classList.toggle('document-section--border-bottom', !!this.data.borderBottom);
+  }
+
   /** Update section properties in place without remounting the block. */
-  applyPropertiesPatch({ name, label, repeatable, hideTitleInPreview, visibility }: any = {}) {
+  applyPropertiesPatch({
+    name,
+    label,
+    repeatable,
+    hideTitleInPreview,
+    borderTop,
+    borderBottom,
+    visibility,
+  }: any = {}) {
     if (name !== undefined) this.data.name = name;
     if (label !== undefined) this.data.label = label;
     if (repeatable !== undefined) this.data.repeatable = !!repeatable;
     if (hideTitleInPreview !== undefined) this.data.hideTitleInPreview = !!hideTitleInPreview;
+    if (borderTop !== undefined) this.data.borderTop = !!borderTop;
+    if (borderBottom !== undefined) this.data.borderBottom = !!borderBottom;
     if (visibility !== undefined) this.data.visibility = visibility ?? null;
     if (this.wrapper) {
       this.wrapper.dataset.sectionName = resolveSectionName(this.data);
     }
+    this.applyBorderClasses();
     this.refreshHeader();
     this.notifySectionDataChange();
   }
@@ -223,6 +254,8 @@ export default class DocumentSection {
       collapsed: !!data.collapsed,
       repeatable: !!data.repeatable,
       hideTitleInPreview: !!data.hideTitleInPreview,
+      borderTop: !!data.borderTop,
+      borderBottom: !!data.borderBottom,
       visibility: data.visibility ?? null,
       segments: JSON.parse(JSON.stringify(data.segments ?? [])),
       fieldValues: JSON.parse(JSON.stringify(data.fieldValues ?? {})),
@@ -231,6 +264,7 @@ export default class DocumentSection {
     if (this.wrapper) {
       this.wrapper.dataset.sectionName = resolveSectionName(this.data);
       this.wrapper.classList.toggle('document-section--collapsed', !!this.data.collapsed);
+      this.applyBorderClasses();
     }
 
     this.refreshHeader();
@@ -296,7 +330,7 @@ export default class DocumentSection {
   }
 
   notifySectionDataChange() {
-    this.config.onSectionDataChange?.(this.getPersistedData());
+    this.config.onSectionDataChange?.(this.getPersistedData(), this.wrapper);
   }
 
   updateSegmentsFromDom() {
@@ -429,6 +463,7 @@ export default class DocumentSection {
     if (this.data.collapsed) {
       this.wrapper.classList.add('document-section--collapsed');
     }
+    this.applyBorderClasses();
 
     this.renderHeader(this.wrapper);
 
@@ -518,7 +553,48 @@ export default class DocumentSection {
     this._unwireKeyboard = wireFieldTokenKeyboard(this.editable, {
       designMode: !!this.config.designMode,
       mappingMode: !!this.config.mappingMode,
+      editorHolder: this.config.editorHolder,
+      getRegistry: this.config.getRegistry,
       getProtectFieldsInFillMode: this.config.getProtectFieldsInFillMode,
+      onActivateFillField: async (token: any) => {
+        const fieldOptions = this.getFieldOptions();
+        const fieldId = token?.dataset?.fieldId;
+        const schema = this.config.getRegistry?.()?.getFieldSchemas?.()?.[fieldId];
+        const isCell = !!token?.classList?.contains('field-token--cell');
+        await pickFillFieldFromToken(
+          token,
+          fieldOptions,
+          (id: any, value: any) => {
+            if (isCell) {
+              fieldOptions.onCellValueChange?.(id, value);
+              if (schema?.type !== 'child') {
+                fieldOptions.onStructureChange?.();
+              }
+              return;
+            }
+            this.data.fieldValues[id] = value;
+            this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
+              getRegistry: this.config.getRegistry,
+              editorHolder: this.config.editorHolder,
+              fieldValueStyle: this.config.fieldValueStyle,
+              fillModeFieldHighlight: this.config.fillModeFieldHighlight,
+            });
+            this.data.fieldValues[id] = value;
+            this.config.onFieldValueChange?.(id, value);
+          },
+          {
+            schema,
+            placeholder: token.dataset.placeholder,
+            updateContext: isCell
+              ? {
+                  ...fieldOptions,
+                  isTableCell: true,
+                  fieldSchemas: this.config.getRegistry?.()?.getFieldSchemas?.() ?? {},
+                }
+              : fieldOptions,
+          },
+        );
+      },
       onDeleteField: (fieldId: any,token: any) => this.deleteInlineField(fieldId, token),
       onStructureChange: () => {
         this.updateSegmentsFromDom();
@@ -538,11 +614,15 @@ export default class DocumentSection {
     this.data.name = this.readNameFromDom(blockContent);
     const serializeRoot = editable.cloneNode(true);
     this.data.segments = serializeEditableToSegments(serializeRoot);
+    // Always sync live token values into fieldValues. Design mode used to skip this,
+    // so Document preview (which reads fieldValues) missed lists/choices visible in the editor.
+    // Template export still strips values via buildTemplateExport / stripValuesFromBlocks.
+    this.data.fieldValues = syncFillComputedFields(editable, this.data.fieldValues, {
+      getRegistry: this.config.getRegistry,
+      editorHolder: this.config.editorHolder,
+    });
+    this.data.fieldValues = recoverImageValuesFromDom(editable, this.data.fieldValues);
     if (!this.config.designMode) {
-      this.data.fieldValues = syncFillComputedFields(editable, this.data.fieldValues, {
-        getRegistry: this.config.getRegistry,
-        editorHolder: this.config.editorHolder,
-      });
       refreshTableCellTokens(editable, this.config);
     }
     pruneTableCellCaretAnchors(editable);
@@ -555,6 +635,8 @@ export default class DocumentSection {
       collapsed: !!this.data.collapsed,
       repeatable: !!this.data.repeatable,
       hideTitleInPreview: !!this.data.hideTitleInPreview,
+      borderTop: !!this.data.borderTop,
+      borderBottom: !!this.data.borderBottom,
       visibility: this.data.visibility ?? null,
       segments: this.data.segments,
       fieldValues: this.data.fieldValues,

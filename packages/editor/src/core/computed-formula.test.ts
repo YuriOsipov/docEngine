@@ -1,7 +1,7 @@
 // @ts-nocheck
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { evaluateFormula } from './computed-formula.js';
+import { evaluateFormula, registerFormulaFunction, resetFormulaFunctions } from './computed-formula.js';
 import { cellFieldId, ensureCellSchemasForRows } from './field-schemas.js';
 
 const blocks = [
@@ -89,5 +89,22 @@ describe('evaluateFormula aggregates', () => {
       { blocks },
     );
     assert.equal(result.value, '7');
+  });
+});
+
+describe('evaluateFormula plugin functions', () => {
+  it('evaluates a registered function', () => {
+    registerFormulaFunction({
+      name: 'round',
+      arity: 1,
+      impl: ([value]) => Math.round(Number(value)),
+    });
+    try {
+      const result = evaluateFormula('round(2.6)', {}, {});
+      assert.equal(result.error, null);
+      assert.equal(result.value, '3');
+    } finally {
+      resetFormulaFunctions();
+    }
   });
 });

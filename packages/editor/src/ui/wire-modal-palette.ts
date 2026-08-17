@@ -27,33 +27,67 @@ export function wireModalConfirmShortcut(overlay: Element | null, btnOk: Element
 }
 
 /**
- * Prefer a host inside Salesforce LightningModal (or our .doc-shell) so field
- * overlays sit inside the platform focus trap. Body-level overlays lose focus
- * to the trap and can freeze the page if focus is force-reclaimed in a loop.
+ * Prefer the full Lightning modal shell (header/body/footer) so field overlays
+ * cover chrome the user can otherwise focus — Esc after clicking Cancel/header
+ * would dismiss the editor while the nested dialog stayed open.
+ * Falls back to .doc-shell / modal content. Avoid document.body under Lightning
+ * (focus trap fights body-level overlays).
  */
 export function resolveFieldModalParent(from?: Element | null): HTMLElement {
   if (!from || !(from instanceof Element)) return document.body;
+  if (from.closest('.p-dialog')) return document.body;
+  const shell = walkOutOfShadow(from);
+  if (shell instanceof HTMLElement) {
+    if (isVueManagedDialog(shell) || shell.closest('.p-dialog')) return document.body;
+    return shell;
+  }
   const host =
     from.closest('.doc-shell') ||
     from.closest('.slds-modal__content') ||
     from.closest('.slds-modal__container') ||
     from.closest('.slds-modal');
-  if (host instanceof HTMLElement) return host;
+  if (host instanceof HTMLElement) {
+    if (isVueManagedDialog(host) || host.closest('.p-dialog')) return document.body;
+    return host;
+  }
   return document.body;
 }
 
 /**
+ * True for Vue-managed dialog shells (e.g. PrimeVue). Mounting overlays into
+ * those nodes breaks Vue VDOM patching (`nextSibling` of null).
+ */
+function isVueManagedDialog(el: Element): boolean {
+  return (
+    el.classList.contains('p-dialog') ||
+    el.getAttribute('data-pc-name') === 'dialog' ||
+    !!el.closest('.p-dialog')
+  );
+}
+
+function resolveLightningDialogHost(node: Element): Element | null {
+  return (
+    node.closest('.slds-modal__container') ||
+    node.closest('.slds-modal') ||
+    node.closest('lightning-modal')
+  );
+}
+
+function resolveAccessibleDialogHost(node: Element): Element | null {
+  const dialog = node.closest('[role="dialog"]');
+  if (!dialog || isVueManagedDialog(dialog)) return null;
+  return dialog;
+}
+
+/**
  * Walk out of nested shadow roots (LWC) so closest() can see Lightning chrome.
+ * Skips PrimeVue / other Vue-owned `[role="dialog"]` hosts.
  */
 function walkOutOfShadow(from: Element): Element | null {
   let node: Node | null = from;
   while (node) {
     if (node instanceof Element) {
-      const hit =
-        node.closest('.slds-modal__container') ||
-        node.closest('.slds-modal') ||
-        node.closest('lightning-modal') ||
-        node.closest('[role="dialog"]');
+      const hit = resolveLightningDialogHost(node) || resolveAccessibleDialogHost(node);
       if (hit) return hit;
     }
     const root = node.getRootNode?.();
@@ -69,17 +103,25 @@ function walkOutOfShadow(from: Element): Element | null {
 /**
  * Prefer the Lightning modal shell (full dialog) over .doc-shell so Document
  * preview covers header/body/footer — not only the narrow page column.
+ * Never mount into Vue-owned dialogs (PrimeVue) — that breaks VDOM patching.
  */
 export function resolvePreviewModalParent(from?: Element | null): HTMLElement {
   if (!from || !(from instanceof Element)) return document.body;
+  if (from.closest('.p-dialog')) return document.body;
   const host = walkOutOfShadow(from) || resolveFieldModalParent(from);
-  if (host instanceof HTMLElement) return host;
+  if (host instanceof HTMLElement) {
+    if (isVueManagedDialog(host) || host.closest('.p-dialog')) return document.body;
+    return host;
+  }
   return document.body;
 }
 
 /** Append overlay under parent; mark contained when not on document.body. */
 export function mountFieldModalOverlay(overlay: HTMLElement, parent?: HTMLElement | null) {
-  const target = parent instanceof HTMLElement ? parent : document.body;
+  let target = parent instanceof HTMLElement ? parent : document.body;
+  if (target !== document.body && (isVueManagedDialog(target) || target.closest('.p-dialog'))) {
+    target = document.body;
+  }
   if (target !== document.body) {
     overlay.classList.add('modal-overlay--contained');
     if (getComputedStyle(target).position === 'static') {

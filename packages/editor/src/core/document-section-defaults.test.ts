@@ -10,8 +10,15 @@ describe('document-section-defaults', () => {
   it('creates an empty document section block', () => {
     const block = createEmptyDocumentSectionBlock();
     assert.equal(block.type, 'documentSection');
+    assert.equal(block.data.name, 'Untitled');
     assert.deepEqual(block.data.segments, []);
     assert.deepEqual(block.data.fieldValues, {});
+  });
+
+  it('allocates unique names when usedNames is provided', () => {
+    const used = new Set(['Untitled']);
+    const block = createEmptyDocumentSectionBlock(used);
+    assert.equal(block.data.name, 'Untitled_2');
   });
 
   it('leaves existing sections unchanged', () => {
@@ -36,5 +43,14 @@ describe('document-section-defaults', () => {
     assert.equal(countDocumentSections(next), 1);
     assert.equal(next[0].type, 'documentSection');
     assert.equal(next[1].type, 'templateBlock');
+  });
+
+  it('dedupes duplicate Untitled section names', () => {
+    const next = ensureAtLeastOneDocumentSection([
+      { type: 'documentSection', data: { name: '', label: '', segments: [], fieldValues: {} } },
+      { type: 'documentSection', data: { name: '', label: '', segments: [], fieldValues: {} } },
+    ]);
+    assert.equal(next[0].data.name, 'Untitled');
+    assert.equal(next[1].data.name, 'Untitled_2');
   });
 });

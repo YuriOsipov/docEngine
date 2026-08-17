@@ -79,6 +79,16 @@
   padding: 0;
 }
 
+.document-section--border-top {
+  border-top: 1px solid #000;
+  padding-top: 6px;
+}
+
+.document-section--border-bottom {
+  border-bottom: 1px solid #000;
+  padding-bottom: 6px;
+}
+
 .document-section__header {
   font-family: var(--me-document-font-family);
   font-size: var(--me-document-font-size);
@@ -1035,6 +1045,7 @@ body.document-columns-col-resize-active .field-token {
   outline-offset: 1px;
 }
 
+.field-token--focused:not(.field-token--design),
 .editor-holder--show-fields .field-token--active:not(.field-token--design) {
   outline: 2px solid var(--me-field-active-outline, #0000FF);
   outline-offset: 2px;
@@ -1091,6 +1102,90 @@ body.document-columns-col-resize-active .field-token {
   max-height: 200px;
   border: 1px solid #ccc;
   border-radius: 4px;
+}
+
+.image-modal__browse-row {
+  margin-bottom: 10px;
+}
+
+.image-modal__browse-row .btn {
+  width: 100%;
+}
+
+.image-files-modal-overlay {
+  z-index: 10050;
+}
+
+.image-files-modal .image-modal__existing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(50vh, 360px);
+  overflow: auto;
+  margin-top: 6px;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.image-modal__existing-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.image-modal__existing-item:hover:not(:disabled) {
+  border-color: #99c;
+  background: #f3f7ff;
+}
+
+.image-modal__existing-item--selected {
+  border-color: #006fea;
+  background: #e8f2ff;
+}
+
+.image-modal__existing-item:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.image-modal__existing-thumb {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #eee;
+  font-size: 10px;
+  color: #555;
+}
+
+.image-modal__existing-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-modal__existing-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal__input {
@@ -2912,7 +3007,7 @@ body.design-mode--panels .editor-top-chrome {
   vertical-align: baseline;
   font-family: var(--me-document-font-family);
   font-size: var(--me-document-font-size);
-  cursor: grab;
+  cursor: pointer;
 }
 
 .field-token--design:hover {
@@ -2921,6 +3016,20 @@ body.design-mode--panels .editor-top-chrome {
 
 .field-token--design:active,
 .field-token--design.field-token--dragging {
+  cursor: grabbing;
+}
+
+/* Grip floats outside the label so it does not shift prose or steal text DnD. */
+.field-token--design > .editor-drag-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate(-100%, -50%);
+  margin-right: 0;
+}
+
+.field-token--design.field-token--dragging > .editor-drag-handle,
+.field-token--design > .editor-drag-handle:active {
   cursor: grabbing;
 }
 
@@ -4575,6 +4684,7 @@ body.field-mapping-split-active {
   background: transparent;
 }
 
+.field-token--focused:not(.field-token--design),
 .editor-holder--show-fields .field-token--active:not(.field-token--design) {
   outline: 2px solid var(--me-field-active-outline);
   outline-offset: 1px;
@@ -5076,8 +5186,10 @@ body:has(.page > .design-shell:not(.design-shell--active)) {
   background: rgba(15, 23, 42, 0.28);
 }
 
+/* Dim chrome (header/footer) while a field dialog covers the full Lightning shell. */
 .modal-overlay--palette.modal-overlay--contained {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.28);
+  z-index: 100;
 }
 
 /* Document preview — fill the Lightning modal shell (not the narrow page column) */

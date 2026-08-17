@@ -2,6 +2,7 @@ import { execRichTextCommand, sanitizeHtml, saveSelection } from '../fields/rich
 import { FORMAT_ICONS } from './format-icons.js';
 import { wireModalEscape } from './wire-modal-escape.js';
 import { applyFieldFormTextStyle } from '../core/page-setup-styles.js';
+import { FIELD_PICKER_POSITION_COOKIE, wireModalMove } from './wire-modal-move.js';
 import {
   FIELD_MODAL_FOOTER_HINT_HTML,
   FIELD_MODAL_OVERLAY_CLASS,
@@ -69,6 +70,7 @@ export function createHtmlTextModal({ parent = null }: { parent?: HTMLElement | 
   mountFieldModalOverlay(overlay, parent);
 
   const modalRoot = overlay.querySelector('.modal') as HTMLElement | null;
+  if (modalRoot) wireModalMove(modalRoot, { cookieKey: FIELD_PICKER_POSITION_COOKIE });
   const header = overlay.querySelector('.modal__header') as HTMLElement | null;
   const toolbar = overlay.querySelector('[data-role="toolbar"]') as HTMLElement | null;
   const editor = overlay.querySelector('[data-role="editor"]') as HTMLElement | null;

@@ -1,6 +1,6 @@
 import { buildFormulaFieldTree, formatFormulaReference } from '../core/formula-field-index.js';
-
-const AGGREGATE_FUNCTIONS = ['sum', 'avg', 'min', 'max', 'count'];
+import { listFormulaPickerFunctions } from '../core/computed-formula.js';
+import type { FormulaFunctionDef } from '../core/computed-formula.js';
 
 function insertIntoTextarea(textarea: any, text: any, selectionStart?: any, selectionEnd?: any) {
   if (!textarea) return;
@@ -117,6 +117,7 @@ function renderTreeNodes(nodes: any,query: any,onSelect: any) {
  *   fieldSchemas?: Record<string, import('../types.d.ts').FieldSchema>,
  *   excludeFieldId?: string | null,
  *   getFormulaTextarea?: () => HTMLTextAreaElement | null,
+ *   formulaFunctions?: import('../types.d.ts').FormulaFunctionDef[],
  * }} options
  */
 export function renderFormulaFieldPicker(container: any,options: any = {}) {
@@ -127,6 +128,7 @@ export function renderFormulaFieldPicker(container: any,options: any = {}) {
     fieldSchemas = {},
     excludeFieldId = null,
     getFormulaTextarea = () => null,
+    formulaFunctions,
   } = options;
 
   container.innerHTML = '';
@@ -139,14 +141,16 @@ export function renderFormulaFieldPicker(container: any,options: any = {}) {
   fnLabel.textContent = 'Wrap selection:';
   fnRow.appendChild(fnLabel);
 
-  for (const fn of AGGREGATE_FUNCTIONS) {
+  const pickerFns: FormulaFunctionDef[] = listFormulaPickerFunctions(formulaFunctions);
+  for (const fn of pickerFns) {
+    const name = fn.name;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-sm formula-field-picker__fn';
-    btn.textContent = fn;
-    btn.title = `Wrap selected formula part with ${fn}()`;
+    btn.textContent = fn.label || name;
+    btn.title = fn.description || `Wrap selected formula part with ${name}()`;
     onPickerActivate(btn, () => {
-      wrapSelectionWithFunction(getFormulaTextarea(), fn);
+      wrapSelectionWithFunction(getFormulaTextarea(), name);
     });
     fnRow.appendChild(btn);
   }

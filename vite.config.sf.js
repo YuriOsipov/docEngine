@@ -76,12 +76,12 @@ export default defineConfig({
         replacement: path.resolve(editorSrc, 'node.ts'),
       },
       {
-        find: '@docengine/editor',
-        replacement: path.resolve(editorSrc, 'index.ts'),
-      },
-      {
         find: /^@docengine\/editor\/(.*)/,
         replacement: `${editorSrc}/$1`,
+      },
+      {
+        find: '@docengine/editor',
+        replacement: path.resolve(editorSrc, 'index.ts'),
       },
     ],
   },

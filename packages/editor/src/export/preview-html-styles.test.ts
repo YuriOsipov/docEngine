@@ -15,6 +15,7 @@ describe('preview-html-styles', () => {
     const css = buildPreviewHtmlStylesheet({});
     assert.match(css, /\.preview-document\s*\{/);
     assert.match(css, /\.document-section__header\s*\{/);
+    assert.match(css, /\.document-section--border-top/);
     assert.match(css, /\.vision-table\s*,/);
     assert.match(css, /border-collapse:\s*collapse/);
     assert.doesNotMatch(css, /<\/style/i);

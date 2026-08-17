@@ -217,16 +217,30 @@ export {
   evaluateFormula,
   detectCircularDependency,
   extractFormulaDependencies,
+  registerFormulaFunction,
+  unregisterFormulaFunction,
+  resetFormulaFunctions,
+  getFormulaFunction,
+  listFormulaFunctions,
+  listFormulaPickerFunctions,
+} from './core/computed-formula.js';
+export type {
+  FormulaFunctionDef,
+  FormulaFunctionKind,
+  FormulaFunctionArity,
 } from './core/computed-formula.js';
 
 export {
   ROOT_SECTION_KEY,
+  DEFAULT_SECTION_NAME,
   slugSectionKey,
   deriveFieldId,
   deriveUniqueFieldName,
   allocateFieldIdentity,
   deriveCellFieldId,
   resolveSectionName,
+  collectUsedSectionNames,
+  allocateUniqueSectionName,
   ensureSchemaName,
   ensureSchemasHaveName,
   findFieldPlacement,

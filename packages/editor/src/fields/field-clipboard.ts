@@ -11,6 +11,9 @@ import {
   insertLineBreakAtCaret,
   insertPlainTextAtCaret,
   normalizeEditableLineStructure,
+  serializeEditableToSegments,
+  renderSegmentsToDom,
+  focusCaretAfter,
 } from './inline-fields.js';
 import {
   getFieldTokensForClipboard,
@@ -20,7 +23,75 @@ import {
 
 export const FIELD_CLIPBOARD_MIME = 'application/x-docengine-field';
 
+const LAYOUT_BLOCK_SELECTOR = '.document-columns, .document-table';
+const PROSE_EDITABLE_SELECTOR =
+  '.document-section__body, .document-columns__col, .template-block__inline';
+
 let internalFieldClipboard: any = null;
+/** Prevents body+column from inserting the same payload twice. */
+let lastPasteStamp = 0;
+let lastPastePayloadKey = '';
+/**
+ * While true, block native `beforeinput` insertFromPaste. Nested contenteditables often
+ * still apply clipboard text/plain after our structured paste even when paste was canceled.
+ */
+let suppressNativePaste = false;
+
+function armNativePasteSuppression() {
+  suppressNativePaste = true;
+  queueMicrotask(() => {
+    suppressNativePaste = false;
+  });
+  // beforeinput can land in a later task in some browsers
+  setTimeout(() => {
+    suppressNativePaste = false;
+  }, 0);
+}
+/** Inspect a live Range without mutating it (same idea as native prose DnD). */
+function rangeContainsSelector(range: Range | null | undefined, selector: string) {
+  if (!range || range.collapsed || !selector) return false;
+  try {
+    const clone = range.cloneContents();
+    const wrap = document.createElement('div');
+    wrap.appendChild(clone);
+    return !!wrap.querySelector(selector);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Innermost prose editable for a node. Columns nest inside the section body, and both
+ * wire clipboard handlers — only the innermost must handle cut/copy/paste.
+ */
+export function resolveProseClipboardEditable(node: any) {
+  if (!node) return null;
+  const el =
+    node.nodeType === Node.ELEMENT_NODE
+      ? node
+      : node.parentElement ?? node.parentNode ?? null;
+  return el?.closest?.(PROSE_EDITABLE_SELECTOR) ?? null;
+}
+
+function isPrimaryClipboardEditable(editable: any, node: any) {
+  return !!editable && resolveProseClipboardEditable(node) === editable;
+}
+
+function stripClipboardChrome(root: any) {
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll('.editor-drag-handle').forEach((el: any) => el.remove());
+}
+
+function shouldSkipDuplicatePaste(payload: any) {
+  const key = JSON.stringify(payload ?? null);
+  const now = Date.now();
+  if (key && key === lastPastePayloadKey && now - lastPasteStamp < 100) {
+    return true;
+  }
+  lastPasteStamp = now;
+  lastPastePayloadKey = key;
+  return false;
+}
 
 function resolveRegistry(options: any, editable: any) {
   if (typeof options?.getRegistry === 'function') return options.getRegistry();
@@ -52,8 +123,125 @@ function buildPayload(tokens: any, action: any, registry: any) {
   };
 }
 
+/**
+ * Non-collapsed selection in this editable that includes field tokens (and not layout blocks).
+ * Same spirit as native prose DnD: preserve interleaved text + fields.
+ */
+export function getProseFragmentSelectionRange(editable: any) {
+  if (!editable) return null;
+  const sel = window.getSelection();
+  if (!sel?.rangeCount || sel.isCollapsed) return null;
+
+  let range: Range;
+  try {
+    range = sel.getRangeAt(0);
+  } catch {
+    return null;
+  }
+
+  const startIn = editable.contains(range.startContainer);
+  const endIn = editable.contains(range.endContainer);
+  if (!startIn || !endIn) return null;
+
+  // Selection lives in a nested column — only that column's handler owns it.
+  if (!isPrimaryClipboardEditable(editable, range.startContainer)) return null;
+
+  if (rangeContainsSelector(range, LAYOUT_BLOCK_SELECTOR)) return null;
+  if (!rangeContainsSelector(range, '.field-token')) return null;
+
+  return range;
+}
+
+/**
+ * Serialize a live selection to clipboard payload v3 (segments + schemas/values).
+ */
+export function buildProseFragmentPayload(range: Range, action: any, registry: any) {
+  const wrap = document.createElement('div');
+  try {
+    wrap.appendChild(range.cloneContents());
+  } catch {
+    return null;
+  }
+
+  // Design grip hint text ("Drag to move") must not enter plainText / segments.
+  stripClipboardChrome(wrap);
+
+  const segments = serializeEditableToSegments(wrap);
+  if (!segments?.length) return null;
+
+  const tokens = [...wrap.querySelectorAll('.field-token')].filter(
+    (token: any) => !token.classList?.contains('field-token--cell'),
+  );
+  const fieldSchemas: Record<string, any> = {};
+  const fieldValues: Record<string, any> = {};
+  const items: any[] = [];
+
+  for (const token of tokens) {
+    const fieldId = token.dataset?.fieldId;
+    if (!fieldId) continue;
+    const schema = registry?.getFieldSchemas()?.[fieldId];
+    if (schema) {
+      fieldSchemas[fieldId] = JSON.parse(JSON.stringify(schema));
+    }
+    fieldValues[fieldId] = readTokenValue(token);
+    items.push(buildItemFromToken(token, registry));
+  }
+
+  // textContent drops <br>; mirror breaks into plainText for external paste fallback.
+  const plainWrap = wrap.cloneNode(true) as HTMLElement;
+  plainWrap.querySelectorAll('br').forEach((br) => {
+    br.replaceWith(document.createTextNode('\n'));
+  });
+  const plainText = String(plainWrap.textContent ?? '')
+    .replace(/\u200B/g, '')
+    .replace(/\uFEFF/g, '');
+
+  return {
+    version: 3,
+    kind: 'prose-fragment',
+    action,
+    segments: JSON.parse(JSON.stringify(segments)),
+    fieldSchemas,
+    fieldValues,
+    items,
+    plainText,
+  };
+}
+
+function remapSegmentFieldIds(segments: any, idMap: Record<string, string>): any {
+  if (!Array.isArray(segments)) return segments;
+  return segments.map((seg: any) => {
+    if (!seg || typeof seg !== 'object') return seg;
+    if ((seg.type === 'field' || seg.type === 'child') && seg.id && idMap[seg.id]) {
+      return { ...seg, id: idMap[seg.id] };
+    }
+    if (seg.type === 'columns' && Array.isArray(seg.columns)) {
+      return {
+        ...seg,
+        columns: seg.columns.map((col: any) => ({
+          ...col,
+          segments: remapSegmentFieldIds(col.segments, idMap),
+        })),
+      };
+    }
+    if (seg.type === 'table') {
+      return seg;
+    }
+    return seg;
+  });
+}
+
 function normalizePayload(payload: any) {
   if (!payload) return null;
+
+  if (
+    payload.version === 3 &&
+    payload.kind === 'prose-fragment' &&
+    Array.isArray(payload.segments) &&
+    payload.segments.length > 0
+  ) {
+    return payload;
+  }
 
   if (payload.version === 2 && Array.isArray(payload.items) && payload.items.length > 0) {
     return payload;
@@ -87,12 +275,17 @@ function parseClipboardPayload(raw: any) {
 }
 
 function clipboardSummary(payload: any) {
-  const count = payload.items.length;
+  if (payload?.version === 3 && payload.kind === 'prose-fragment') {
+    const plain = String(payload.plainText ?? '').trim();
+    if (plain) return plain;
+  }
+  const count = payload.items?.length ?? 0;
   if (count === 1) {
     const item = payload.items[0];
     return `[Field: ${item.placeholder || item.fieldId}]`;
   }
-  return `[${count} fields]`;
+  if (count > 1) return `[${count} fields]`;
+  return '';
 }
 
 let pendingSystemClipboardPayload: any = null;
@@ -115,6 +308,10 @@ function writeClipboard(e: any, payload: any) {
   internalFieldClipboard = payload;
   e.clipboardData.setData(FIELD_CLIPBOARD_MIME, json);
   e.clipboardData.setData('text/plain', clipboardSummary(payload));
+}
+
+function clearInternalFieldClipboard() {
+  internalFieldClipboard = null;
 }
 
 function pasteFieldItem(editable: any, item: any, action: any, options: any, reservedIds: any, reservedNames: any) {
@@ -165,10 +362,16 @@ function pasteFieldItem(editable: any, item: any, action: any, options: any, res
 
 export function pasteFieldPayload(editable: any, payload: any, options: any = {}) {
   const normalized = normalizePayload(payload);
+  if (!normalized) return [];
+
+  if (normalized.version === 3 && normalized.kind === 'prose-fragment') {
+    return pasteProseFragmentPayload(editable, normalized, options);
+  }
+
   if (!normalized?.items?.length) return [];
 
-  const reservedIds = new Set();
-  const reservedNames = new Set();
+  const reservedIds = new Set<string>();
+  const reservedNames = new Set<string>();
   const tokens = [];
 
   for (const item of normalized.items) {
@@ -180,104 +383,296 @@ export function pasteFieldPayload(editable: any, payload: any, options: any = {}
   return tokens;
 }
 
+function insertFragmentAtCaret(editable: any, fragment: DocumentFragment) {
+  const sel = window.getSelection();
+  if (!sel?.rangeCount || !editable.contains(sel.anchorNode)) {
+    editable.appendChild(fragment);
+    return fragment.lastChild ?? null;
+  }
+
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const last = fragment.lastChild;
+  range.insertNode(fragment);
+  if (last) focusCaretAfter(last);
+  return last;
+}
+
+/**
+ * Paste a v3 prose-fragment payload (text + fields) at the caret.
+ * @returns inserted field tokens
+ */
+export function pasteProseFragmentPayload(editable: any, payload: any, options: any = {}) {
+  const normalized = normalizePayload(payload);
+  if (!normalized || normalized.version !== 3 || normalized.kind !== 'prose-fragment') {
+    return [];
+  }
+
+  const { onEditSchema, onDeleteField, onTokenInserted } = options;
+  const registry = resolveRegistry(options, editable);
+  const action = normalized.action ?? 'copy';
+  const reservedIds = new Set<string>();
+  const reservedNames = new Set<string>();
+  const idMap: Record<string, string> = {};
+  const fieldValues: Record<string, any> = {};
+
+  const schemaEntries = Object.entries(normalized.fieldSchemas ?? {});
+  // Prefer schema map; fall back to items list when schemas were omitted.
+  const ids =
+    schemaEntries.length > 0
+      ? schemaEntries.map(([id]) => id)
+      : (normalized.items ?? []).map((item: any) => item.fieldId).filter(Boolean);
+
+  for (const oldId of ids) {
+    const itemSchema =
+      normalized.fieldSchemas?.[oldId] ??
+      normalized.items?.find((item: any) => item.fieldId === oldId)?.schema ??
+      null;
+    const itemValue =
+      normalized.fieldValues?.[oldId] ??
+      normalized.items?.find((item: any) => item.fieldId === oldId)?.value;
+
+    const reusingCutId =
+      action === 'cut' && oldId && !isFieldIdInUse(oldId, reservedIds, editable);
+
+    let fieldId: string;
+    if (reusingCutId) {
+      fieldId = oldId;
+      reservedIds.add(fieldId);
+      if (!registry?.getFieldSchemas()?.[fieldId] && itemSchema) {
+        registry?.updateFieldSchema(fieldId, JSON.parse(JSON.stringify(itemSchema)));
+      }
+      const schema = registry?.getFieldSchemas()?.[fieldId];
+      const name = schema?.name ?? schema?.label ?? itemSchema?.name;
+      if (name) reservedNames.add(String(name).trim());
+    } else {
+      const baseName =
+        itemSchema?.name ?? itemSchema?.label ?? 'Field';
+      const { fieldId: nextId, fieldName } = allocateFieldIdentity(editable, registry, baseName, {
+        reservedIds,
+        reservedNames,
+      });
+      fieldId = nextId;
+      reservedIds.add(fieldId);
+      reservedNames.add(fieldName);
+      const schema = itemSchema
+        ? { ...JSON.parse(JSON.stringify(itemSchema)), name: fieldName }
+        : createDefaultSchema('text', 'Field');
+      schema.name = fieldName;
+      registry?.updateFieldSchema(fieldId, schema);
+    }
+
+    idMap[oldId] = fieldId;
+    fieldValues[fieldId] = itemValue;
+    onTokenInserted?.(fieldId, itemValue);
+  }
+
+  const segments = remapSegmentFieldIds(normalized.segments, idMap);
+  const fragment = renderSegmentsToDom(segments, fieldValues, {
+    ...options,
+    designMode: true,
+    getRegistry: () => registry,
+    onEditSchema,
+    onDeleteField,
+  });
+
+  const tokens = [...fragment.querySelectorAll('.field-token')];
+  insertFragmentAtCaret(editable, fragment);
+  normalizeEditableLineStructure(editable);
+  return tokens;
+}
+
+function cutProseFragmentRange(range: Range, payload: any, options: any) {
+  const fieldIds = Object.keys(payload.fieldSchemas ?? {});
+  try {
+    if (typeof (range as any).deleteContents === 'function') {
+      range.deleteContents();
+    }
+  } catch {
+    /* ignore */
+  }
+  for (const fieldId of fieldIds) {
+    options.onDeleteField?.(fieldId, null);
+  }
+}
+
 export function wireFieldClipboard(editable: any, options: any = {}) {
   const registry = resolveRegistry(options, editable);
 
-  function onCopy(e: any) {
-    if (!editable.contains(e.target)) return;
-    const tokens = getFieldTokensForClipboard(editable);
-    if (!tokens.length) return;
+  function eventNode(e: any) {
+    return e?.target ?? document.activeElement;
+  }
+
+  /**
+   * Ownership follows the caret when possible. Paste events on nested contenteditables
+   * often target the outer section body even when the caret is inside a column.
+   */
+  function ownsEvent(e: any) {
+    const sel = window.getSelection();
+    const caret = sel?.anchorNode;
+    if (caret && (editable === caret || editable.contains(caret))) {
+      const primary = resolveProseClipboardEditable(caret);
+      if (primary === editable) return true;
+      // Outer body received the paste event; caret lives in a nested column.
+      if (e?.target === editable && primary && editable.contains(primary)) return true;
+      return false;
+    }
+    const node = eventNode(e);
+    if (!editable.contains(node) && node !== editable) return false;
+    return isPrimaryClipboardEditable(editable, node);
+  }
+
+  function resolveCopyCutPayload(action: 'copy' | 'cut') {
+    const proseRange = getProseFragmentSelectionRange(editable);
+    if (proseRange) {
+      const payload = buildProseFragmentPayload(proseRange, action, registry);
+      if (payload) return { kind: 'prose' as const, payload, range: proseRange };
+    }
+
+    const tokens = getFieldTokensForClipboard(editable).filter(
+      (token: any) => action === 'copy' || !token.classList?.contains('field-token--cell'),
+    );
+    if (!tokens.length) return null;
+    // Nested column owns tokens that live inside it — body must not also cut/copy them.
+    const first = tokens[0];
+    if (first && !isPrimaryClipboardEditable(editable, first)) return null;
+    return { kind: 'fields' as const, payload: buildPayload(tokens, action, registry), tokens };
+  }
+
+  function cancelNativePaste(e: any) {
     e.preventDefault();
-    writeClipboard(e, buildPayload(tokens, 'copy', registry));
+    e.stopPropagation();
+    e.stopImmediatePropagation?.();
+    armNativePasteSuppression();
+  }
+
+  function applyPastePayload(payload: any) {
+    if (shouldSkipDuplicatePaste(payload)) return null;
+    const tokens = pasteFieldPayload(editable, payload, options);
+    if (tokens.length) {
+      selectDesignToken(tokens[tokens.length - 1], editable, { additive: false });
+    } else if (payload.version === 3) {
+      options.onTokenRemoved?.();
+    }
+    return tokens;
+  }
+
+  function onCopy(e: any) {
+    if (!ownsEvent(e)) return;
+    const resolved = resolveCopyCutPayload('copy');
+    if (!resolved) {
+      // Native plain-text copy/cut — drop stale field payload so paste won't revive it.
+      clearInternalFieldClipboard();
+      return;
+    }
+    e.preventDefault();
+    writeClipboard(e, resolved.payload);
     clearDesignTokenSelection(editable);
   }
 
   function onCut(e: any) {
-    if (!editable.contains(e.target)) return;
-    const tokens = getFieldTokensForClipboard(editable).filter(
-      (token: any) => !token.classList?.contains('field-token--cell'),
-    );
-    if (!tokens.length) return;
-    e.preventDefault();
-    const payload = buildPayload(tokens, 'cut', registry);
-    writeClipboard(e, payload);
-    for (const token of tokens) {
-      options.onDeleteField?.(token.dataset.fieldId, token);
-      token.remove();
+    if (!ownsEvent(e)) return;
+    const resolved = resolveCopyCutPayload('cut');
+    if (!resolved) {
+      clearInternalFieldClipboard();
+      return;
     }
+    e.preventDefault();
+    writeClipboard(e, resolved.payload);
+
+    if (resolved.kind === 'prose' && resolved.range) {
+      cutProseFragmentRange(resolved.range, resolved.payload, options);
+    } else if (resolved.kind === 'fields' && resolved.tokens) {
+      for (const token of resolved.tokens) {
+        options.onDeleteField?.(token.dataset.fieldId, token);
+        token.remove();
+      }
+    }
+
     options.onTokenRemoved?.();
     clearDesignTokenSelection(editable);
   }
 
-  async function onPaste(e: any) {
-    if (!editable.contains(e.target)) return;
+  function onPaste(e: any) {
+    if (!ownsEvent(e)) return;
 
-    const raw =
-      e.clipboardData?.getData(FIELD_CLIPBOARD_MIME) ||
-      (internalFieldClipboard ? JSON.stringify(internalFieldClipboard) : '');
+    const mimeRaw = e.clipboardData?.getData(FIELD_CLIPBOARD_MIME) || '';
+    const plain = e.clipboardData?.getData('text/plain');
+    // Prefer live clipboard MIME. Fall back to in-memory payload only when the custom
+    // type is missing (some browsers strip it) — never when a newer plain cut replaced it
+    // (internal was cleared on that cut/copy).
+    const raw = mimeRaw || (internalFieldClipboard ? JSON.stringify(internalFieldClipboard) : '');
     const payload = parseClipboardPayload(raw);
     if (payload) {
-      e.preventDefault();
-      const tokens = pasteFieldPayload(editable, payload, options);
-      if (tokens.length) {
-        selectDesignToken(tokens[tokens.length - 1], editable, { additive: false });
-      }
+      cancelNativePaste(e);
+      applyPastePayload(payload);
       return;
     }
 
-    const plain = e.clipboardData?.getData('text/plain');
     if (plain == null || plain === '') return;
 
     const sel = window.getSelection();
     const anchor = sel?.anchorNode;
     if (!anchor || !editable.contains(anchor)) return;
+    if (!isPrimaryClipboardEditable(editable, anchor)) return;
     if (anchor.parentElement?.closest?.('.field-token, .document-table')) {
       return;
     }
 
-    e.preventDefault();
+    if (shouldSkipDuplicatePaste({ plain })) return;
+    cancelNativePaste(e);
     insertPlainTextAtCaret(editable, plain);
     normalizeEditableLineStructure(editable);
     options.onTokenRemoved?.();
   }
 
+  function onBeforeInput(e: any) {
+    if (!suppressNativePaste) return;
+    if (e.inputType !== 'insertFromPaste') return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation?.();
+  }
+
   function onKeyDown(e: any) {
-    if (!editable.contains(document.activeElement) && !editable.contains(e.target)) return;
+    const focusNode = document.activeElement ?? e.target;
+    if (!editable.contains(focusNode) && focusNode !== editable) return;
+    if (!isPrimaryClipboardEditable(editable, focusNode)) return;
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-      const tokens = getFieldTokensForClipboard(editable);
-      if (!tokens.length) return;
+      const resolved = resolveCopyCutPayload('copy');
+      if (!resolved) {
+        clearInternalFieldClipboard();
+        return;
+      }
       e.preventDefault();
-      flushClipboardToSystem(buildPayload(tokens, 'copy', registry));
+      flushClipboardToSystem(resolved.payload);
       clearDesignTokenSelection(editable);
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-      const tokens = getFieldTokensForClipboard(editable).filter(
-        (token: any) => !token.classList?.contains('field-token--cell'),
-      );
-      if (!tokens.length) return;
-      e.preventDefault();
-      const payload = buildPayload(tokens, 'cut', registry);
-      flushClipboardToSystem(payload);
-      for (const token of tokens) {
-        options.onDeleteField?.(token.dataset.fieldId, token);
-        token.remove();
+      const resolved = resolveCopyCutPayload('cut');
+      if (!resolved) {
+        clearInternalFieldClipboard();
+        return;
       }
+      e.preventDefault();
+      flushClipboardToSystem(resolved.payload);
+
+      if (resolved.kind === 'prose' && resolved.range) {
+        cutProseFragmentRange(resolved.range, resolved.payload, options);
+      } else if (resolved.kind === 'fields' && resolved.tokens) {
+        for (const token of resolved.tokens) {
+          options.onDeleteField?.(token.dataset.fieldId, token);
+          token.remove();
+        }
+      }
+
       options.onTokenRemoved?.();
       clearDesignTokenSelection(editable);
     }
 
-    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-      const raw = internalFieldClipboard ? JSON.stringify(internalFieldClipboard) : null;
-      const payload = parseClipboardPayload(raw);
-      if (!payload) return;
-      e.preventDefault();
-      const tokens = pasteFieldPayload(editable, payload, options);
-      if (tokens.length) {
-        selectDesignToken(tokens[tokens.length - 1], editable, { additive: false });
-      }
-    }
+    // Paste is handled only on the `paste` / beforeinput path.
 
     if (e.key === 'Enter' && !e.shiftKey) {
       if (e.defaultPrevented) return;
@@ -285,6 +680,7 @@ export function wireFieldClipboard(editable: any, options: any = {}) {
       if (!sel?.rangeCount) return;
       const anchor = sel.anchorNode;
       if (!editable.contains(anchor)) return;
+      if (!isPrimaryClipboardEditable(editable, anchor)) return;
       if (anchor?.parentElement?.closest?.('.field-token')) return;
       e.preventDefault();
       insertLineBreakAtCaret(editable);
@@ -292,15 +688,18 @@ export function wireFieldClipboard(editable: any, options: any = {}) {
     }
   }
 
+  // Capture so we run before other paste handlers and can cancel native insertFromPaste.
   editable.addEventListener('copy', onCopy);
   editable.addEventListener('cut', onCut);
-  editable.addEventListener('paste', onPaste);
+  editable.addEventListener('paste', onPaste, true);
+  editable.addEventListener('beforeinput', onBeforeInput, true);
   document.addEventListener('keydown', onKeyDown);
 
   return () => {
     editable.removeEventListener('copy', onCopy);
     editable.removeEventListener('cut', onCut);
-    editable.removeEventListener('paste', onPaste);
+    editable.removeEventListener('paste', onPaste, true);
+    editable.removeEventListener('beforeinput', onBeforeInput, true);
     document.removeEventListener('keydown', onKeyDown);
   };
 }

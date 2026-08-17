@@ -40,6 +40,24 @@ export default defineConfig({
         replacement: path.resolve(__dirname, '../../packages/editor/src/node.ts'),
       },
       {
+        find: '@docengine/editor/ui/field-form-modal',
+        replacement: path.resolve(
+          __dirname,
+          '../../packages/editor/src/ui/field-form-modal.ts',
+        ),
+      },
+      {
+        find: '@docengine/editor/ui/wire-modal-palette',
+        replacement: path.resolve(
+          __dirname,
+          '../../packages/editor/src/ui/wire-modal-palette.ts',
+        ),
+      },
+      {
+        find: /^@docengine\/editor\/(.*)/,
+        replacement: `${path.resolve(__dirname, '../../packages/editor/src')}/$1`,
+      },
+      {
         find: '@docengine/editor',
         replacement: path.resolve(__dirname, '../../packages/editor/src/index.ts'),
       },

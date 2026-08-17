@@ -52,6 +52,26 @@ public with sharing class DocEngineInstanceController {
     @AuraEnabled public Id contentDocumentId { get; set; }
   }
 
+  /** Field-image upload for fill/design (keeps Document_JSON__c under Long Text Area limits). */
+  public class ImageUploadResult {
+    @AuraEnabled public String url { get; set; }
+    @AuraEnabled public Id contentVersionId { get; set; }
+    @AuraEnabled public Id contentDocumentId { get; set; }
+  }
+
+  /** Image File linked to a source record (for the image picker browse list). */
+  public class RecordImageItem {
+    @AuraEnabled public Id contentDocumentId { get; set; }
+    @AuraEnabled public Id contentVersionId { get; set; }
+    @AuraEnabled public String title { get; set; }
+    @AuraEnabled public String fileExtension { get; set; }
+    @AuraEnabled public String thumbnailUrl { get; set; }
+  }
+
+  private static final Set<String> IMAGE_EXTENSIONS = new Set<String>{
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'
+  };
+
   @AuraEnabled(cacheable=true)
   public static InstanceDTO getInstance(Id instanceId) {
     if (instanceId == null) {
@@ -174,6 +194,15 @@ public with sharing class DocEngineInstanceController {
     if (String.isBlank(dto.documentJson)) {
       throw new AuraHandledException('documentJson is required.');
     }
+    // Long Text Area max — embedded data:image URLs blow this limit quickly.
+    Integer jsonLen = dto.documentJson.length();
+    if (jsonLen > 131072) {
+      throw new AuraHandledException(
+        'Document JSON is too large (' +
+          String.valueOf(jsonLen) +
+          ' chars; max 131072). Re-upload images so they are stored as Files, not embedded data URLs.'
+      );
+    }
 
     DocEngineAccess.assertTemplateAccess(dto.templateId);
     if (dto.id != null) {
@@ -220,6 +249,237 @@ public with sharing class DocEngineInstanceController {
     List<DocEngine_Document__c> safe = (List<DocEngine_Document__c>) decision.getRecords();
     upsert safe;
     return getInstance(safe[0].Id);
+  }
+
+  /**
+   * Upload a field image as ContentVersion (optionally linked to recordId) and return a URL
+   * suitable for &lt;img src&gt;. Prefers Content Delivery download URL; falls back to
+   * authenticated shepherd download URL.
+   */
+  @AuraEnabled
+  public static ImageUploadResult uploadFieldImage(
+    String recordId,
+    String base64Data,
+    String filename
+  ) {
+    if (String.isBlank(base64Data)) {
+      throw new AuraHandledException('base64Data is required.');
+    }
+    String raw = base64Data.trim();
+    Integer comma = raw.indexOf(',');
+    if (raw.startsWithIgnoreCase('data:') && comma > 0) {
+      raw = raw.substring(comma + 1);
+    }
+    Blob body;
+    try {
+      body = EncodingUtil.base64Decode(raw);
+    } catch (Exception e) {
+      throw new AuraHandledException('Invalid image data.');
+    }
+    if (body == null || body.size() == 0) {
+      throw new AuraHandledException('Image data is empty.');
+    }
+    // Keep headroom under synchronous Apex heap for base64 round-trips.
+    if (body.size() > 3500000) {
+      throw new AuraHandledException('Image is too large (max ~3.5 MB). Use a smaller file.');
+    }
+
+    if (String.isBlank(filename)) {
+      filename = 'image.png';
+    }
+    String lower = filename.toLowerCase();
+    if (
+      !(
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.svg')
+      )
+    ) {
+      filename = filename + '.png';
+    }
+
+    ContentVersion cv = new ContentVersion();
+    String title = filename;
+    Integer dot = title.lastIndexOf('.');
+    if (dot > 0) {
+      title = title.substring(0, dot);
+    }
+    cv.Title = title.left(255);
+    cv.PathOnClient = filename;
+    cv.VersionData = body;
+    cv.IsMajorVersion = true;
+
+    Id parentId = null;
+    if (String.isNotBlank(recordId)) {
+      try {
+        parentId = Id.valueOf(recordId.trim());
+      } catch (Exception e) {
+        parentId = null;
+      }
+    }
+    if (parentId != null) {
+      cv.FirstPublishLocationId = parentId;
+    }
+    insert cv;
+
+    cv = [
+      SELECT Id, ContentDocumentId
+      FROM ContentVersion
+      WHERE Id = :cv.Id
+      WITH SECURITY_ENFORCED
+      LIMIT 1
+    ];
+
+    ImageUploadResult out = new ImageUploadResult();
+    out.contentVersionId = cv.Id;
+    out.contentDocumentId = cv.ContentDocumentId;
+    out.url = resolveImagePublicUrl(cv.Id, title);
+    return out;
+  }
+
+  /**
+   * Image Files linked to a Salesforce record (Notes &amp; Attachments / Files related list).
+   * Newest first; capped at 50.
+   */
+  @AuraEnabled(cacheable=true)
+  public static List<RecordImageItem> listRecordImages(String recordId) {
+    if (String.isBlank(recordId)) {
+      throw new AuraHandledException('recordId is required.');
+    }
+    Id parentId;
+    try {
+      parentId = Id.valueOf(recordId.trim());
+    } catch (Exception e) {
+      throw new AuraHandledException('Invalid recordId.');
+    }
+
+    List<ContentDocumentLink> links = [
+      SELECT ContentDocumentId
+      FROM ContentDocumentLink
+      WHERE LinkedEntityId = :parentId
+      WITH SECURITY_ENFORCED
+    ];
+    if (links.isEmpty()) {
+      return new List<RecordImageItem>();
+    }
+
+    Set<Id> docIds = new Set<Id>();
+    for (ContentDocumentLink link : links) {
+      docIds.add(link.ContentDocumentId);
+    }
+
+    List<ContentVersion> versions = [
+      SELECT Id, ContentDocumentId, Title, FileExtension, ContentModifiedDate
+      FROM ContentVersion
+      WHERE ContentDocumentId IN :docIds AND IsLatest = TRUE
+      WITH SECURITY_ENFORCED
+      ORDER BY ContentModifiedDate DESC
+      LIMIT 200
+    ];
+
+    List<RecordImageItem> out = new List<RecordImageItem>();
+    for (ContentVersion cv : versions) {
+      String ext = String.isBlank(cv.FileExtension) ? '' : cv.FileExtension.toLowerCase();
+      if (!IMAGE_EXTENSIONS.contains(ext)) {
+        continue;
+      }
+      RecordImageItem item = new RecordImageItem();
+      item.contentDocumentId = cv.ContentDocumentId;
+      item.contentVersionId = cv.Id;
+      item.title = cv.Title;
+      item.fileExtension = ext;
+      item.thumbnailUrl =
+        System.URL.getOrgDomainUrl().toExternalForm() +
+        '/sfc/servlet.shepherd/version/renditionDownload?rendition=THUMB720BY480&versionId=' +
+        String.valueOf(cv.Id);
+      out.add(item);
+      if (out.size() >= 50) {
+        break;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Resolve an existing ContentVersion to a URL suitable for &lt;img src&gt; (no re-upload).
+   */
+  @AuraEnabled
+  public static ImageUploadResult resolveFieldImage(String contentVersionId) {
+    if (String.isBlank(contentVersionId)) {
+      throw new AuraHandledException('contentVersionId is required.');
+    }
+    Id versionId;
+    try {
+      versionId = Id.valueOf(contentVersionId.trim());
+    } catch (Exception e) {
+      throw new AuraHandledException('Invalid contentVersionId.');
+    }
+
+    List<ContentVersion> rows = [
+      SELECT Id, ContentDocumentId, Title, FileExtension
+      FROM ContentVersion
+      WHERE Id = :versionId
+      WITH SECURITY_ENFORCED
+      LIMIT 1
+    ];
+    if (rows.isEmpty()) {
+      throw new AuraHandledException('ContentVersion not found.');
+    }
+    ContentVersion cv = rows[0];
+    String ext = String.isBlank(cv.FileExtension) ? '' : cv.FileExtension.toLowerCase();
+    if (!IMAGE_EXTENSIONS.contains(ext)) {
+      throw new AuraHandledException('Selected file is not an image.');
+    }
+
+    String title = String.isNotBlank(cv.Title) ? cv.Title : 'image';
+    ImageUploadResult out = new ImageUploadResult();
+    out.contentVersionId = cv.Id;
+    out.contentDocumentId = cv.ContentDocumentId;
+    out.url = resolveImagePublicUrl(cv.Id, title);
+    return out;
+  }
+
+  /**
+   * Prefer Content Delivery download URL; fall back to authenticated shepherd download.
+   */
+  private static String resolveImagePublicUrl(Id contentVersionId, String title) {
+    String url;
+    try {
+      ContentDistribution cd = new ContentDistribution();
+      String name = String.isBlank(title) ? 'image' : title;
+      cd.Name = name.left(100);
+      cd.ContentVersionId = contentVersionId;
+      cd.PreferencesAllowViewInBrowser = true;
+      cd.PreferencesLinkLatestVersion = true;
+      cd.PreferencesNotifyOnVisit = false;
+      cd.PreferencesPasswordRequired = false;
+      cd.PreferencesAllowOriginalDownload = true;
+      insert cd;
+
+      ContentDistribution created = [
+        SELECT ContentDownloadUrl, DistributionPublicUrl
+        FROM ContentDistribution
+        WHERE Id = :cd.Id
+        WITH SECURITY_ENFORCED
+        LIMIT 1
+      ];
+      url = String.isNotBlank(created.ContentDownloadUrl)
+        ? created.ContentDownloadUrl
+        : created.DistributionPublicUrl;
+    } catch (Exception e) {
+      url = null;
+    }
+
+    if (String.isBlank(url)) {
+      url =
+        System.URL.getOrgDomainUrl().toExternalForm() +
+        '/sfc/servlet.shepherd/version/download/' +
+        String.valueOf(contentVersionId);
+    }
+    return url;
   }
 
   /**

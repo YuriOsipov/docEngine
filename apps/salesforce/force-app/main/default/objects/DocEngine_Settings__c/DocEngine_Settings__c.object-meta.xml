@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
     <customSettingsType>Hierarchy</customSettingsType>
-    <description>Org-level DocEngine options. Use External PDF checkbox switches Salesforce Blob.toPdf vs hosted pdf-service.</description>
+    <description>Org-level DocEngine options. Use External PDF switches Salesforce Blob.toPdf vs your HTTPS PDF host (n8n DocEngine node or pdf-service).</description>
     <enableFeeds>false</enableFeeds>
     <label>DocEngine Settings</label>
     <visibility>Public</visibility>

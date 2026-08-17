@@ -28,6 +28,8 @@ body{margin:0;padding:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,
 .preview-document__title{font-size:18px;font-weight:bold;margin-bottom:16px}
 .preview-document__section{white-space:pre-wrap;word-wrap:break-word;outline:none;min-height:0}
 .document-section__header{font-weight:bold;margin-bottom:8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+.preview-document__section-wrap.document-section--border-top{border-top:1px solid #000;padding-top:6px}
+.preview-document__section-wrap.document-section--border-bottom{border-bottom:1px solid #000;padding-bottom:6px}
 .document-section__label-text{font-weight:bold}
 .document-columns{margin:0.5em 0}
 .document-columns__grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}

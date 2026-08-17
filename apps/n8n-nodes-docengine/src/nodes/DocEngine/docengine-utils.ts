@@ -38,6 +38,7 @@ export function assertTemplate(template: unknown): TemplateExport {
 }
 
 export function getByPath(path: string, data: Record<string, unknown> | null | undefined): unknown {
+  if (path != null && typeof path !== 'string') return undefined;
   const trimmed = String(path ?? '').trim();
   if (!trimmed) return data;
 
@@ -48,6 +49,58 @@ export function getByPath(path: string, data: Record<string, unknown> | null | u
     current = current[part];
   }
   return current;
+}
+
+/**
+ * Resolve field values from the n8n "Values JSON Path" parameter.
+ *
+ * n8n may return:
+ * - an object (JS / expression mode, or a JSON mapping)
+ * - a JSON string of that object
+ * - a dot-path into the incoming item (`sections`, `body.values`, …)
+ * - empty → use the whole item JSON
+ *
+ * Previously an object/JSON mapping was treated as a path, missed, and silently
+ * fell back to the entire incoming item (so a prior document/PDF payload was
+ * rendered instead of the stored template + mapped values).
+ */
+export function resolveInputValues(
+  rawParam: unknown,
+  itemJson: Record<string, unknown> | null | undefined,
+): unknown {
+  const fallback = itemJson ?? {};
+
+  if (rawParam == null) return fallback;
+
+  if (typeof rawParam === 'object') {
+    return rawParam;
+  }
+
+  if (typeof rawParam !== 'string') {
+    return rawParam;
+  }
+
+  const str = rawParam.trim();
+  if (!str) return fallback;
+
+  if (
+    (str.startsWith('{') && str.endsWith('}')) ||
+    (str.startsWith('[') && str.endsWith(']'))
+  ) {
+    try {
+      return JSON.parse(str);
+    } catch {
+      throw new Error(
+        'Values JSON is not valid JSON. Use a dot-path (e.g. sections) or a JSON object of field values.',
+      );
+    }
+  }
+
+  const fromPath = getByPath(str, fallback);
+  if (fromPath === undefined) {
+    throw new Error(`Values JSON Path "${str}" was not found on the incoming item.`);
+  }
+  return fromPath;
 }
 
 export function resolveTemplateFromItem(itemJson: Record<string, unknown>, path = ''): TemplateExport {

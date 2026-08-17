@@ -50,6 +50,11 @@ export {
 
 export { evaluateComputedField } from './core/computed-formula.js';
 export {
+  registerFormulaFunction,
+  unregisterFormulaFunction,
+  listFormulaFunctions,
+} from './core/computed-formula.js';
+export {
   DEFAULT_DOCUMENT_BODY_STYLE,
   DEFAULT_FIELD_VALUE_STYLE_OPTIONS,
   DOCUMENT_BODY_LINE_HEIGHT,

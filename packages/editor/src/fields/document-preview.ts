@@ -629,6 +629,8 @@ export function renderDocumentPreview(doc: any, options: any = {}) {
       const wrap = document.createElement('div');
       wrap.className = 'preview-document__section-wrap';
       if (data.repeatable) wrap.dataset.repeatable = 'true';
+      if (data.borderTop) wrap.classList.add('document-section--border-top');
+      if (data.borderBottom) wrap.classList.add('document-section--border-bottom');
 
       if (showTitle) {
         const header = document.createElement('div');

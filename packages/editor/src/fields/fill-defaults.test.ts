@@ -73,4 +73,17 @@ describe('resolveValueOrFillDefault', () => {
       'hello',
     );
   });
+
+  it('keeps populated child field objects (not treat them as empty images)', () => {
+    const schema = {
+      type: 'child',
+      label: 'address',
+      name: 'address',
+      fieldSchemas: {
+        city: { type: 'text', name: 'City', label: 'City' },
+      },
+    };
+    const value = { city: 'milan' };
+    assert.deepEqual(resolveValueOrFillDefault(schema, value, { designMode: false }), value);
+  });
 });

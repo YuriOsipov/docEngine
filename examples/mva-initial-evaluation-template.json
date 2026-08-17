@@ -1,0 +1,316 @@
+{
+  "kind": "template",
+  "version": 1,
+  "time": 1786128000000,
+  "fieldSchemas": {
+    "patientName": {
+      "type": "text",
+      "name": "Patient Name",
+      "label": "Patient"
+    },
+    "dob": {
+      "type": "text",
+      "name": "Date of Birth",
+      "label": "DOB"
+    },
+    "visitDate": {
+      "type": "text",
+      "name": "Visit Date",
+      "label": "Visited on"
+    },
+    "provider": {
+      "type": "text",
+      "name": "Provider",
+      "label": "Signed by"
+    },
+    "accidentDate": {
+      "type": "text",
+      "name": "Accident Date",
+      "label": "Date of accident"
+    },
+    "patientRole": {
+      "type": "choice",
+      "name": "Patient Role",
+      "label": "Patient role",
+      "multi": false,
+      "defaultValue": "",
+      "items": [
+        { "id": "role-driver", "label": "Driver" },
+        { "id": "role-passenger", "label": "Passenger" },
+        { "id": "role-pedestrian", "label": "Pedestrian" }
+      ]
+    },
+    "crashDescription": {
+      "type": "choice",
+      "name": "Crash Description",
+      "label": "Crash type",
+      "multi": false,
+      "allowManualEdit": true,
+      "defaultValue": "",
+      "items": [
+        { "id": "crash-rear", "label": "Struck from behind while stopped" },
+        { "id": "crash-front", "label": "Front-end collision" },
+        { "id": "crash-side", "label": "Side-impact collision" },
+        { "id": "crash-other", "label": "Other / describe" }
+      ]
+    },
+    "postImpact": {
+      "type": "list",
+      "name": "Post-impact findings",
+      "label": "Immediately after impact",
+      "multi": true,
+      "itemLayout": "inline",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "items": [
+        { "id": "pi-no-airbags", "label": "Airbags did not deploy" },
+        { "id": "pi-airbags", "label": "Airbags deployed" },
+        { "id": "pi-head-straight", "label": "Head position straight at impact" },
+        { "id": "pi-no-loc", "label": "No loss of consciousness" },
+        { "id": "pi-loc", "label": "Loss of consciousness" },
+        { "id": "pi-no-er", "label": "Did not go to ER" },
+        { "id": "pi-er", "label": "Went to ER / hospital" }
+      ]
+    },
+    "painAreas": {
+      "type": "list",
+      "name": "Pain areas",
+      "label": "Areas of pain",
+      "multi": true,
+      "itemLayout": "lines",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "items": [
+        { "id": "pain-head", "label": "Headaches" },
+        { "id": "pain-neck", "label": "Neck pain" },
+        { "id": "pain-upper-back", "label": "Upper / mid back pain" },
+        { "id": "pain-low-back", "label": "Low back pain" },
+        { "id": "pain-r-shoulder", "label": "Right shoulder pain" },
+        { "id": "pain-l-shoulder", "label": "Left shoulder pain" }
+      ]
+    },
+    "painNow": {
+      "type": "text",
+      "name": "Current pain",
+      "label": "Pain now (0–10)",
+      "defaultText": ""
+    },
+    "painWorst": {
+      "type": "text",
+      "name": "Worst pain",
+      "label": "Pain at worst (0–10)",
+      "defaultText": ""
+    },
+    "diagnoses": {
+      "type": "list",
+      "name": "Assessment",
+      "label": "Assessment / ICD",
+      "multi": true,
+      "itemLayout": "lines",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "displayStyle": { "fontWeight": "bold" },
+      "items": [
+        { "id": "dx-m54-12", "label": "Radiculopathy, cervical region (M54.12)" },
+        { "id": "dx-m54-17", "label": "Radiculopathy, lumbosacral region (M54.17)" },
+        { "id": "dx-m54-2", "label": "Cervicalgia (M54.2)" },
+        { "id": "dx-m54-51", "label": "Vertebrogenic low back pain (M54.51)" },
+        { "id": "dx-s13-8", "label": "Neck sprain (S13.8XXA)" },
+        { "id": "dx-s23-3", "label": "Thoracic sprain (S23.3XXA)" },
+        { "id": "dx-s33-5", "label": "Lumbar sprain (S33.5XXA)" },
+        { "id": "dx-s43-r", "label": "Right shoulder sprain (S43.491A)" },
+        { "id": "dx-s43-l", "label": "Left shoulder sprain (S43.402A)" },
+        { "id": "dx-g44", "label": "Acute post-traumatic headache (G44.319)" },
+        { "id": "dx-v49", "label": "MVA driver, initial encounter (V49.40XA)" }
+      ]
+    },
+    "causation": {
+      "type": "choice",
+      "name": "Causation",
+      "label": "Causation opinion",
+      "multi": false,
+      "defaultValue": "Injuries are directly and proximately caused by the accident noted above",
+      "items": [
+        {
+          "id": "causation-yes",
+          "label": "Injuries are directly and proximately caused by the accident noted above"
+        },
+        { "id": "causation-other", "label": "See narrative / other opinion" }
+      ]
+    },
+    "imaging": {
+      "type": "list",
+      "name": "Imaging referrals",
+      "label": "Imaging referred",
+      "multi": true,
+      "itemLayout": "lines",
+      "defaultValue": [],
+      "items": [
+        { "id": "img-mri-c", "label": "MRI Cervical Spine" },
+        { "id": "img-mri-l", "label": "MRI Lumbar Spine" },
+        { "id": "img-mri-l-sh", "label": "MRI Left Shoulder" },
+        { "id": "img-mri-r-sh", "label": "MRI Right Shoulder" }
+      ]
+    },
+    "prognosis": {
+      "type": "choice",
+      "name": "Prognosis",
+      "label": "Prognosis",
+      "multi": false,
+      "defaultValue": "",
+      "items": [
+        { "id": "prog-excellent", "label": "Excellent" },
+        { "id": "prog-good", "label": "Good" },
+        { "id": "prog-fair", "label": "Fair" },
+        { "id": "prog-guarded", "label": "Guarded" },
+        { "id": "prog-poor", "label": "Poor" }
+      ]
+    },
+    "visitsPerWeek": {
+      "type": "text",
+      "name": "Visits per week",
+      "label": "# visits/week",
+      "defaultText": "3"
+    },
+    "weeksOfCare": {
+      "type": "text",
+      "name": "Weeks of care",
+      "label": "# of weeks",
+      "defaultText": "4"
+    },
+    "planOfCare": {
+      "type": "list",
+      "name": "Plan of care",
+      "label": "Plan of care",
+      "multi": true,
+      "itemLayout": "lines",
+      "allowManualEdit": true,
+      "defaultValue": [],
+      "items": [
+        { "id": "poc-arom-c", "label": "Cervical AROM / stretching" },
+        { "id": "poc-arom-l", "label": "Lumbar AROM / stretching" },
+        { "id": "poc-stab", "label": "Spinal stabilization exercises" },
+        { "id": "poc-nmre", "label": "Neuromuscular reeducation" },
+        { "id": "poc-shoulder", "label": "Shoulder strengthening / stretching" },
+        { "id": "poc-cmt-c", "label": "CMT – cervical spine" },
+        { "id": "poc-cmt-t", "label": "CMT – thoracic spine" },
+        { "id": "poc-cmt-l", "label": "CMT – lumbar spine" },
+        { "id": "poc-cmt-si", "label": "CMT – sacroiliac joints" },
+        { "id": "poc-ist", "label": "Intersegmental traction" },
+        { "id": "poc-estim", "label": "E-stimulation" }
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Header",
+        "label": "Header",
+        "segments": [
+          {
+            "type": "text",
+            "content": "Center For Physical Medicine\nInitial Evaluation Note — Motor Vehicle Accident\n\nPatient: "
+          },
+          { "type": "field", "id": "patientName", "placeholder": "Patient" },
+          { "type": "text", "content": "\nDOB: " },
+          { "type": "field", "id": "dob", "placeholder": "DOB" },
+          { "type": "text", "content": "\nVisited on: " },
+          { "type": "field", "id": "visitDate", "placeholder": "Visit date" },
+          { "type": "text", "content": "\nProvider: " },
+          { "type": "field", "id": "provider", "placeholder": "Provider" }
+        ],
+        "fieldValues": {
+          "patientName": "",
+          "dob": "",
+          "visitDate": "",
+          "provider": ""
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Accident",
+        "label": "Accident / Subjective",
+        "segments": [
+          {
+            "type": "text",
+            "content": "CC: Initial evaluation of injuries following a motor vehicle accident.\n\nDate of accident: "
+          },
+          { "type": "field", "id": "accidentDate", "placeholder": "Accident date" },
+          { "type": "text", "content": "\nPatient role: " },
+          { "type": "field", "id": "patientRole", "placeholder": "Role" },
+          { "type": "text", "content": "\nCrash: " },
+          { "type": "field", "id": "crashDescription", "placeholder": "Crash description" },
+          { "type": "text", "content": "\nImmediately after impact: " },
+          { "type": "field", "id": "postImpact", "placeholder": "Post-impact" },
+          { "type": "text", "content": "\n\nPain areas: " },
+          { "type": "field", "id": "painAreas", "placeholder": "Pain areas" },
+          { "type": "text", "content": "\nPain now: " },
+          { "type": "field", "id": "painNow", "placeholder": "0–10" },
+          { "type": "text", "content": " / 10; at worst: " },
+          { "type": "field", "id": "painWorst", "placeholder": "0–10" },
+          { "type": "text", "content": " / 10." }
+        ],
+        "fieldValues": {
+          "accidentDate": "",
+          "patientRole": "",
+          "crashDescription": "",
+          "postImpact": [],
+          "painAreas": [],
+          "painNow": "",
+          "painWorst": ""
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Assessment",
+        "label": "Assessment",
+        "segments": [
+          { "type": "text", "content": "Assessment:\n" },
+          { "type": "field", "id": "diagnoses", "placeholder": "Diagnoses" },
+          { "type": "text", "content": "\n\nCausation: " },
+          { "type": "field", "id": "causation", "placeholder": "Causation" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "diagnoses": [],
+          "causation": "Injuries are directly and proximately caused by the accident noted above"
+        }
+      }
+    },
+    {
+      "type": "documentSection",
+      "data": {
+        "name": "Plan",
+        "label": "Plan",
+        "segments": [
+          { "type": "text", "content": "Prognosis: " },
+          { "type": "field", "id": "prognosis", "placeholder": "Prognosis" },
+          { "type": "text", "content": "\nImaging: " },
+          { "type": "field", "id": "imaging", "placeholder": "Imaging" },
+          { "type": "text", "content": "\n\nPlan of care: " },
+          { "type": "field", "id": "visitsPerWeek", "placeholder": "visits/week" },
+          { "type": "text", "content": " visits/week × " },
+          { "type": "field", "id": "weeksOfCare", "placeholder": "weeks" },
+          {
+            "type": "text",
+            "content": " weeks; reevaluate after care period.\n\nInterventions: "
+          },
+          { "type": "field", "id": "planOfCare", "placeholder": "Plan of care" },
+          { "type": "text", "content": "." }
+        ],
+        "fieldValues": {
+          "prognosis": "",
+          "imaging": [],
+          "visitsPerWeek": "3",
+          "weeksOfCare": "4",
+          "planOfCare": []
+        }
+      }
+    }
+  ]
+}

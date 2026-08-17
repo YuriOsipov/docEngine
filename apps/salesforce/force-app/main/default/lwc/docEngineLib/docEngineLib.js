@@ -9,6 +9,9 @@ import pdfViewer from '@salesforce/resourceUrl/DocEnginePdfViewer';
 import isPdfAvailable from '@salesforce/apex/DocEnginePdfController.isAvailable';
 import getPdfProvider from '@salesforce/apex/DocEnginePdfController.getPdfProvider';
 import generatePdfBase64 from '@salesforce/apex/DocEnginePdfController.generatePdfBase64';
+import uploadFieldImage from '@salesforce/apex/DocEngineInstanceController.uploadFieldImage';
+import listRecordImages from '@salesforce/apex/DocEngineInstanceController.listRecordImages';
+import resolveFieldImage from '@salesforce/apex/DocEngineInstanceController.resolveFieldImage';
 
 const assetsByComponent = new WeakMap();
 let cachedPdfProvider = null;
@@ -89,14 +92,159 @@ export async function resolvePdfProvider() {
 }
 
 function apexErrorMessage(err) {
-  return (
-    (err &&
-      err.body &&
-      (err.body.message ||
-        (err.body.pageErrors && err.body.pageErrors[0] && err.body.pageErrors[0].message))) ||
-    (err && err.message) ||
-    String(err)
-  );
+  if (!err) return 'Unknown error';
+  const body = err.body;
+  if (typeof body === 'string' && body.trim()) return body;
+  if (Array.isArray(body) && body.length) {
+    const parts = body
+      .map((e) => (e && (e.message || e.exceptionMessage)) || '')
+      .filter(Boolean);
+    if (parts.length) return parts.join('; ');
+  }
+  if (body && typeof body === 'object') {
+    if (typeof body.message === 'string' && body.message) return body.message;
+    if (body.message && typeof body.message === 'object') {
+      try {
+        return JSON.stringify(body.message);
+      } catch (e) {
+        /* fall through */
+      }
+    }
+    if (body.exceptionMessage) return body.exceptionMessage;
+    if (body.pageErrors && body.pageErrors[0] && body.pageErrors[0].message) {
+      return body.pageErrors[0].message;
+    }
+    if (body.fieldErrors && typeof body.fieldErrors === 'object') {
+      const msgs = [];
+      Object.keys(body.fieldErrors).forEach((field) => {
+        (body.fieldErrors[field] || []).forEach((e) => {
+          if (e && e.message) msgs.push(e.message);
+        });
+      });
+      if (msgs.length) return msgs.join('; ');
+    }
+  }
+  if (err.message && err.message !== '[object Object]') return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch (e) {
+    return String(err);
+  }
+}
+
+export { apexErrorMessage };
+
+const DATA_IMAGE_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,/i;
+
+/**
+ * Salesforce image uploader — stores Files via Apex so field values stay under Long Text Area limits.
+ * When recordId is set, also allows picking an existing image File on that record.
+ * @param {string|null|undefined} recordId Optional parent record (Sales Order, Template, …).
+ */
+export function createSalesforceImageUpload(recordId) {
+  const parentId = recordId || null;
+  const config = {
+    stub: false,
+    uploadByFile: async (file) => {
+      const base64 = await blobToBase64(file);
+      const result = await uploadFieldImage({
+        recordId: parentId,
+        base64Data: base64,
+        filename: (file && file.name) || 'image.png'
+      });
+      if (!result || !result.url) {
+        throw new Error('Image upload returned no URL');
+      }
+      return {
+        success: 1,
+        file: { url: result.url, name: (file && file.name) || 'image.png' }
+      };
+    },
+    uploadByUrl: async (url) => ({
+      success: 1,
+      file: { url: String(url || '').trim() }
+    })
+  };
+
+  if (parentId) {
+    config.listExistingImages = async () => {
+      const rows = await listRecordImages({ recordId: parentId });
+      return (rows || []).map((row) => ({
+        id: String(row.contentVersionId || ''),
+        name: row.title
+          ? row.fileExtension
+            ? `${row.title}.${row.fileExtension}`
+            : row.title
+          : String(row.contentVersionId || 'image'),
+        url: row.thumbnailUrl || undefined,
+        extension: row.fileExtension || undefined
+      })).filter((item) => item.id);
+    };
+    config.resolveExistingImage = async (id) => {
+      const result = await resolveFieldImage({ contentVersionId: id });
+      if (!result || !result.url) {
+        throw new Error('Could not resolve Salesforce File URL');
+      }
+      return {
+        success: 1,
+        file: { url: result.url, name: String(id) }
+      };
+    };
+  }
+
+  return config;
+}
+
+/**
+ * Replace embedded data:image URLs in an exportFields payload with File URLs.
+ * Safe no-op when none are present. Mutates a deep clone.
+ * @param {object} values
+ * @param {string|null|undefined} recordId
+ */
+export async function replaceEmbeddedImageDataUrls(values, recordId) {
+  if (!values || typeof values !== 'object') return values;
+  const clone = JSON.parse(JSON.stringify(values));
+
+  async function persistUrl(dataUrl) {
+    const mimeMatch = String(dataUrl).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/i);
+    const mime = (mimeMatch && mimeMatch[1]) || 'image/png';
+    let ext = 'png';
+    if (/jpeg|jpg/i.test(mime)) ext = 'jpg';
+    else if (/gif/i.test(mime)) ext = 'gif';
+    else if (/webp/i.test(mime)) ext = 'webp';
+    else if (/svg/i.test(mime)) ext = 'svg';
+    const result = await uploadFieldImage({
+      recordId: recordId || null,
+      base64Data: dataUrl,
+      filename: `field-image.${ext}`
+    });
+    if (!result || !result.url) {
+      throw new Error('Could not persist embedded image to Files');
+    }
+    return result.url;
+  }
+
+  async function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        await walk(item);
+      }
+      return;
+    }
+    if (typeof node.url === 'string' && DATA_IMAGE_URL_RE.test(node.url)) {
+      node.url = await persistUrl(node.url);
+      delete node.embedded;
+      delete node.stub;
+    }
+    const keys = Object.keys(node);
+    for (let i = 0; i < keys.length; i += 1) {
+      await walk(node[keys[i]]);
+    }
+  }
+
+  await walk(clone);
+  return clone;
 }
 
 function withPdfHint(message) {
@@ -174,6 +322,12 @@ table.sf-pdf-table td {
 .vision-table__row-actions,
 .document-table__row-actions {
   display: none !important;
+}
+/* Blob.toPdf ignores CSS max-width on images — width is set per <img> in JS. */
+img.field-token__thumb,
+.field-token--image img {
+  height: auto !important;
+  max-width: 100% !important;
 }
 `.trim();
 
@@ -352,6 +506,26 @@ export function normalizeHtmlForSalesforcePdf(html) {
         cell.style.verticalAlign = 'top';
       }
     });
+  });
+
+  // Salesforce Blob.toPdf ignores CSS max-width — pin field images to schema maxWidth.
+  doc.querySelectorAll('.field-token--image img, img.field-token__thumb').forEach((img) => {
+    const token = img.closest ? img.closest('.field-token--image') : null;
+    let maxW = 320;
+    if (token) {
+      const fromVar =
+        (token.style && token.style.getPropertyValue('--field-image-max-width')) || '';
+      const fromData = token.getAttribute('data-max-width') || '';
+      const n = parseInt(fromVar || fromData, 10);
+      if (n > 0) maxW = n;
+    } else {
+      const attrW = parseInt(img.getAttribute('width') || '', 10);
+      if (attrW > 0) maxW = attrW;
+    }
+    img.setAttribute('width', String(maxW));
+    img.style.width = maxW + 'px';
+    img.style.maxWidth = maxW + 'px';
+    img.style.height = 'auto';
   });
 
   // Soft wrap after - / in long tokens (helps codes like 1.2-0.6)
@@ -536,13 +710,16 @@ export function createDocEditor(options) {
 }
 
 /**
- * Resolve createDocEditor options with PDF helpers when a PDF provider is available.
+ * Resolve createDocEditor options with PDF helpers and Salesforce image upload.
+ * Pass `recordId` to link uploaded images to the source record / template.
  * @param {object} options
  */
 export async function resolveCreateDocEditorOptions(options = {}) {
+  const { recordId, imageUpload, ...rest } = options;
   const pdfOk = await checkPdfAvailable();
   return {
-    ...options,
+    ...rest,
+    imageUpload: imageUpload || createSalesforceImageUpload(recordId || null),
     generatePdfBlob:
       options.generatePdfBlob !== undefined
         ? options.generatePdfBlob

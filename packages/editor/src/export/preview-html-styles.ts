@@ -81,6 +81,16 @@ body {
 .preview-document__section-wrap {
   margin-bottom: 1em;
 }
+.preview-document__section-wrap.document-section--border-top,
+.document-section.document-section--border-top {
+  border-top: 1px solid #000;
+  padding-top: 6px;
+}
+.preview-document__section-wrap.document-section--border-bottom,
+.document-section.document-section--border-bottom {
+  border-bottom: 1px solid #000;
+  padding-bottom: 6px;
+}
 .preview-document__section,
 .document-section__body {
   font-family: var(--me-document-font-family);
@@ -288,7 +298,7 @@ body {
   display: block;
   width: auto;
   height: auto;
-  max-width: 320px;
+  max-width: var(--field-image-max-width, 320px);
   border-radius: 2px;
   border: 1px solid #ccc;
 }

@@ -54,7 +54,12 @@ export function collectRemappableEntries(root: any) {
   if (root.classList.contains('document-columns')) {
     root.querySelectorAll('.field-token:not(.field-token--cell)').forEach(addField);
     root.querySelectorAll('.document-table').forEach(addTable);
+    return entries;
   }
+
+  // Mixed prose fragments (text + field tokens) moved via native selection DnD.
+  root.querySelectorAll?.('.field-token:not(.field-token--cell)').forEach(addField);
+  root.querySelectorAll?.('.document-table').forEach(addTable);
 
   return entries;
 }

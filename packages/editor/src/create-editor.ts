@@ -1,3 +1,4 @@
+import { wireEditorJsNativeDropGuard } from './fields/wire-editorjs-native-drop-guard.js';
 import EditorJS from '@editorjs/editorjs';
 // EditorJS CJS typings conflict with verbatimModuleSyntax; treat as any constructable.
 const EditorJSCtor: any = EditorJS;
@@ -66,6 +67,7 @@ import {
   previewFieldMapping as runFieldMappingPreview,
   normalizeFieldMappingSpec,
   evaluateSectionVisibility,
+  registerFormulaFunction,
 } from '@docengine/engine';
 
 import {
@@ -91,12 +93,16 @@ import {
   syncColumnListSourceSettings,
   syncTableColumnKeyChanges,
   ensureSchemaForFieldProperties,
+  resolveSchemaDefaultValue,
 } from './core/field-schemas.js';
 import {
   findFieldPlacement,
   migrateFieldIds,
   rebuildFieldIdsForSection,
   resolveSectionName,
+  allocateUniqueSectionName,
+  collectUsedSectionNames,
+  DEFAULT_SECTION_NAME,
 } from './core/field-id.js';
 import { renameSectionInFormulas } from './core/formula-field-index.js';
 import { SchemaRegistry } from './registry/schema-registry.js';
@@ -121,6 +127,7 @@ import {
   collectAllFieldValuesFromHolder,
   resolveSelectedTextForFieldConversion,
   syncFillComputedFields,
+  recoverImageValuesFromDom,
 } from './fields/inline-fields.js';
 import { saveSelection } from './fields/rich-text.js';
 import { readTableRowsFromDom, refreshTableHeadersInDom } from './fields/table-field.js';
@@ -147,6 +154,21 @@ const DEFAULT_EMPTY_DOCUMENT = {
   fieldSchemas: {},
   blocks: [createEmptyDocumentSectionBlock()],
 };
+
+/** Types that change document structure and require an Editor.js remount. */
+function isStructuralFieldType(type: any) {
+  return type === 'table' || type === 'child';
+}
+
+/**
+ * Inline↔inline type switches (text/choice/image/…) can refresh tokens in place.
+ * Table/child transitions still remount.
+ */
+function canRefreshFieldTypeInDom(previousType: any, newType: any) {
+  if (!previousType || !newType || previousType === newType) return false;
+  if (isStructuralFieldType(previousType) || isStructuralFieldType(newType)) return false;
+  return isInlineFieldType(previousType) && isInlineFieldType(newType);
+}
 
 function migrateFieldSchemas(schemas: any) {
   const next: any = { ...schemas };
@@ -392,6 +414,8 @@ export function createEditor(options: any = {}) {
   let designMode = !!options.designMode;
   let showFieldsInFillMode = options.ui?.showFieldsInFillMode !== false;
   let editor: any = null;
+  /** Serializes setDesignMode so concurrent reinits don't call EditorJS.destroy() twice. */
+  let setDesignModeInFlight: Promise<void> | null = null;
   let destroyed = false;
   let lastFocusedEditable: any = null;
   let historyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -600,6 +624,12 @@ export function createEditor(options: any = {}) {
     configureImageUpload(options.imageUpload);
   }
 
+  if (Array.isArray(options.formulaFunctions)) {
+    for (const def of options.formulaFunctions) {
+      if (def) registerFormulaFunction(def);
+    }
+  }
+
   const fieldModalParent = resolveFieldModalParent(holder);
   const previewModalParent = resolvePreviewModalParent(holder);
   const treeModal = createTreeModal({ parent: fieldModalParent });
@@ -637,26 +667,72 @@ export function createEditor(options: any = {}) {
     onShareDocument:
       typeof options.onShareDocument === 'function' ? options.onShareDocument : null,
   });
-  const fieldMappingModal = createFieldMappingModal({
-    getTemplate: () => ({
-      blocks: registry.getBlocks(),
-      fieldSchemas: registry.getFieldSchemas(),
-    }),
-    onSave: (spec: any) => {
-      documentFieldMapping = spec;
-    },
-  });
+  const fieldMappingModal = options.mappingMode
+    ? null
+    : createFieldMappingModal({
+        getTemplate: () => ({
+          blocks: registry.getBlocks(),
+          fieldSchemas: registry.getFieldSchemas(),
+        }),
+        onSave: (spec: any) => {
+          documentFieldMapping = spec;
+        },
+      });
   const richTextToolbar = createRichTextToolbar();
+
+  /** Depth of open nested field dialogs — keeps host Escape blockers accurate when stacked. */
+  let nestedModalDepth = 0;
+  function notifyNestedModal(open: boolean) {
+    if (open) nestedModalDepth += 1;
+    else nestedModalDepth = Math.max(0, nestedModalDepth - 1);
+    options.onNestedModalStateChange?.(nestedModalDepth > 0);
+  }
+  function guardNestedModal<T>(promise: Promise<T>): Promise<T> {
+    notifyNestedModal(true);
+    return Promise.resolve(promise).then(
+      (result) => {
+        // Resolved (OK / Clear) — not Close/Escape/cancel.
+        options.onFieldPickerApplied?.();
+        return result;
+      },
+      (err) => {
+        throw err;
+      },
+    ).finally(() => {
+      notifyNestedModal(false);
+    });
+  }
+
+  const openTree =
+    options.pickers?.openTreePicker ??
+    ((opts: any) => treeModal.open({ ...opts, textStyle: getFormTextStyle() }));
+  const openList =
+    options.pickers?.openListPicker ??
+    ((opts: any) => listModal.open({ ...opts, textStyle: getFormTextStyle() }));
+  const openText =
+    options.pickers?.openTextPicker ??
+    ((opts: any) => textModal.open({ ...opts, textStyle: getFormTextStyle() }));
+  const openHtmlText =
+    options.pickers?.openHtmlTextPicker ??
+    ((opts: any) => htmlTextModal.open({ ...opts, textStyle: getFormTextStyle() }));
+  const openInteger =
+    options.pickers?.openIntegerPicker ?? ((opts: any) => integerModal.open(opts));
+  const openImage =
+    options.pickers?.openImagePicker ?? ((opts: any) => imageModal.open(opts));
+  const openDate = options.pickers?.openDatePicker;
 
   const pickerCallbacks = {
     ...(options.pickers ?? {}),
-    openTreePicker: options.pickers?.openTreePicker ?? ((opts: any) => treeModal.open({ ...opts, textStyle: getFormTextStyle() })),
-    openListPicker: options.pickers?.openListPicker ?? ((opts: any) => listModal.open({ ...opts, textStyle: getFormTextStyle() })),
-    openTextPicker: options.pickers?.openTextPicker ?? ((opts: any) => textModal.open({ ...opts, textStyle: getFormTextStyle() })),
-    openHtmlTextPicker: options.pickers?.openHtmlTextPicker ?? ((opts: any) => htmlTextModal.open({ ...opts, textStyle: getFormTextStyle() })),
-    openIntegerPicker: options.pickers?.openIntegerPicker ?? ((opts: any) => integerModal.open(opts)),
-    openImagePicker: options.pickers?.openImagePicker ?? ((opts: any) => imageModal.open(opts)),
-    openDatePicker: options.pickers?.openDatePicker,
+    openTreePicker: (opts: any) => guardNestedModal(Promise.resolve(openTree(opts))),
+    openListPicker: (opts: any) => guardNestedModal(Promise.resolve(openList(opts))),
+    openTextPicker: (opts: any) => guardNestedModal(Promise.resolve(openText(opts))),
+    openHtmlTextPicker: (opts: any) => guardNestedModal(Promise.resolve(openHtmlText(opts))),
+    openIntegerPicker: (opts: any) => guardNestedModal(Promise.resolve(openInteger(opts))),
+    openImagePicker: (opts: any) => guardNestedModal(Promise.resolve(openImage(opts))),
+    openDatePicker: openDate
+      ? (opts: any) =>
+          guardNestedModal(Promise.resolve(openDate({ ...opts, parent: fieldModalParent })))
+      : undefined,
   };
 
   function getAllDocumentEditables() {
@@ -684,7 +760,7 @@ export function createEditor(options: any = {}) {
     let editable = resolveTargetEditable();
     if (!editable) {
       const count = editor.blocks.getBlocksCount();
-      await editor.blocks.insert('documentSection', { segments: [], fieldValues: {} }, {}, count);
+      await editor.blocks.insert('documentSection', createUniqueSectionData(), {}, count);
       await editor.isReady;
       editable = getAllDocumentEditables().at(-1) ?? null;
     }
@@ -725,15 +801,30 @@ export function createEditor(options: any = {}) {
     };
   }
 
-  function syncSectionDataToRegistry(sectionData: any) {
+  function syncSectionDataToRegistry(sectionData: any, sectionEl: any = null) {
     if (!sectionData) return;
-    const sectionName = resolveSectionName(sectionData);
     const blocks = [...(registry.getBlocks() ?? [])];
-    const index = blocks.findIndex(
-      (block: any) =>
-        block.type === 'documentSection' && resolveSectionName(block.data ?? {}) === sectionName,
-    );
-    if (index < 0) return;
+    let index = -1;
+
+    // Prefer DOM block index so duplicate section names (legacy Untitled…) do not
+    // overwrite the wrong registry entry.
+    if (sectionEl?.closest) {
+      const ceBlock = sectionEl.closest('.ce-block');
+      if (ceBlock) {
+        const allBlocks = [...holder.querySelectorAll('.ce-block')];
+        index = allBlocks.indexOf(ceBlock);
+      }
+    }
+
+    if (index < 0 || blocks[index]?.type !== 'documentSection') {
+      const sectionName = resolveSectionName(sectionData);
+      index = blocks.findIndex(
+        (block: any) =>
+          block.type === 'documentSection' && resolveSectionName(block.data ?? {}) === sectionName,
+      );
+    }
+
+    if (index < 0 || blocks[index]?.type !== 'documentSection') return;
     blocks[index] = {
       ...blocks[index],
       data: {
@@ -743,6 +834,43 @@ export function createEditor(options: any = {}) {
     };
     registry.setBlocks(blocks);
     scheduleHistoryRecord();
+  }
+
+  function collectLiveSectionNames() {
+    const used = collectUsedSectionNames(registry.getBlocks() ?? []);
+    holder.querySelectorAll?.('.document-section[data-section-name]')?.forEach((el: Element) => {
+      const name = el.getAttribute('data-section-name');
+      if (name) used.add(name);
+    });
+    return used;
+  }
+
+  /** Names allocated for in-flight inserts before registry/DOM catch up. */
+  const pendingSectionNames = new Set<string>();
+
+  function allocateSectionName() {
+    const used = collectLiveSectionNames();
+    for (const name of pendingSectionNames) used.add(name);
+    const next = allocateUniqueSectionName(used, DEFAULT_SECTION_NAME);
+    pendingSectionNames.add(next);
+    queueMicrotask(() => {
+      const live = collectLiveSectionNames();
+      for (const name of [...pendingSectionNames]) {
+        if (live.has(name)) pendingSectionNames.delete(name);
+      }
+    });
+    return next;
+  }
+
+  function createUniqueSectionData(extra: Record<string, unknown> = {}) {
+    const name = allocateSectionName();
+    return {
+      name,
+      label: '',
+      segments: [],
+      fieldValues: {},
+      ...extra,
+    };
   }
 
   function getHistorySnapshot() {
@@ -1056,6 +1184,60 @@ export function createEditor(options: any = {}) {
     const idChanged = newFieldId !== previousFieldId;
     const typeChanged = previousType !== updated.type;
 
+    // Compatible inline type change — update schema + tokens without remounting Editor.js.
+    if (!idChanged && typeChanged && canRefreshFieldTypeInDom(previousType, updated.type)) {
+      const defaultValue = resolveSchemaDefaultValue(updated, { forTemplate: true });
+      let nextSchemas = syncColumnListSourceSettings(previousFieldId, updated, {
+        ...registry.getFieldSchemas(),
+        [previousFieldId]: updated,
+      });
+      registry.setFieldSchemas(nextSchemas);
+
+      const registryBlocks = registry.getBlocks() ?? [];
+      if (registryBlocks.length) {
+        registry.setBlocks(syncBlocksAfterSchemaChange(registryBlocks, previousFieldId, updated));
+      }
+
+      const tokenSelector = `.field-token[data-field-id="${CSS.escape(previousFieldId)}"]`;
+      for (const section of holder.querySelectorAll('.document-section')) {
+        const tool = (section as any).__documentSectionTool;
+        if (!tool?.data) continue;
+        if (!section.querySelector(tokenSelector)) continue;
+        if (!tool.data.fieldValues || typeof tool.data.fieldValues !== 'object') {
+          tool.data.fieldValues = {};
+        }
+        tool.data.fieldValues[previousFieldId] = defaultValue;
+      }
+
+      const ctx = { getRegistry: () => registry, fieldValueStyle };
+      for (const token of holder.querySelectorAll(tokenSelector)) {
+        updateFieldToken(token, defaultValue, updated.label ?? token.dataset.placeholder, ctx);
+      }
+
+      for (const wrapper of holder.querySelectorAll('.template-block')) {
+        if (!wrapper.querySelector(tokenSelector)) continue;
+        for (const cls of [...wrapper.classList]) {
+          if (cls.startsWith('template-block--')) wrapper.classList.remove(cls);
+        }
+        wrapper.classList.add(`template-block--${updated.type}`);
+      }
+
+      refreshFieldSchemaInDom(previousFieldId, ctx, holder);
+      const cellRef = parseCellFieldId(previousFieldId, registry.getFieldSchemas());
+      if (cellRef) {
+        refreshTableColumnStylesForFieldIds(
+          [previousFieldId],
+          registry.getFieldSchemas(),
+          holder,
+          fieldValueStyle,
+        );
+      }
+
+      options.onSchemaChange?.(registry.getFieldSchemas());
+      scheduleHistoryRecord(true);
+      return true;
+    }
+
     if (idChanged || typeChanged) {
       const saved = await editor.save();
       let nextSchemas = registry.getFieldSchemas();
@@ -1215,15 +1397,14 @@ export function createEditor(options: any = {}) {
     await editor.isReady;
     const count = editor.blocks.getBlocksCount();
     const index = atIndex ?? count;
-    await editor.blocks.insert(
-      'documentSection',
-      { name: '', label: '', segments: [], fieldValues: {} },
-      {},
-      index,
-    );
+    const sectionData = createUniqueSectionData();
+    await editor.blocks.insert('documentSection', sectionData, {}, index);
     selectedSectionBlockIndex = index;
     if (propertiesPanel) {
-      propertiesPanel.showSection(index, { name: '', label: '' });
+      propertiesPanel.showSection(index, {
+        name: sectionData.name,
+        label: sectionData.label,
+      });
       updateSectionSelectionHighlight();
     }
   }
@@ -1243,7 +1424,17 @@ export function createEditor(options: any = {}) {
     lastFocusedEditable = editable;
   }
 
-  async function handleSaveSection({ blockIndex, name, label, repeatable, hideTitleInPreview, visibility, sectionEl }: any) {
+  async function handleSaveSection({
+    blockIndex,
+    name,
+    label,
+    repeatable,
+    hideTitleInPreview,
+    borderTop,
+    borderBottom,
+    visibility,
+    sectionEl,
+  }: any) {
     if (!editor) return;
     const saved = await editor.save();
     const blocks = [...saved.blocks];
@@ -1271,6 +1462,8 @@ export function createEditor(options: any = {}) {
       label,
       repeatable: !!repeatable,
       hideTitleInPreview: !!hideTitleInPreview,
+      borderTop: !!borderTop,
+      borderBottom: !!borderBottom,
       visibility: visibility ?? null,
     };
     blocks[blockIndex] = block;
@@ -1292,6 +1485,8 @@ export function createEditor(options: any = {}) {
           label,
           repeatable: !!repeatable,
           hideTitleInPreview: !!hideTitleInPreview,
+          borderTop: !!borderTop,
+          borderBottom: !!borderBottom,
           visibility: visibility ?? null,
         });
       }
@@ -1949,6 +2144,7 @@ export function createEditor(options: any = {}) {
       onDeleteSchema: handleDeleteSchema,
       onSectionNameChange: handleSectionNameChange,
       onPaletteDrop: handlePaletteDrop,
+      allocateSectionName,
       onSectionDataChange: syncSectionDataToRegistry,
       onFieldValueChange: refreshSectionVisibility,
       onSchemaChange: (schemas: any) => options.onSchemaChange?.(schemas),
@@ -2042,7 +2238,7 @@ export function createEditor(options: any = {}) {
       if (destroyed || !editor || countLiveDocumentSections() > 0) return;
       await editor.blocks.insert(
         'documentSection',
-        createEmptyDocumentSectionBlock().data,
+        createUniqueSectionData(),
         {},
         0,
         true,
@@ -2100,12 +2296,24 @@ export function createEditor(options: any = {}) {
     }
     syncStylesFromPageSetup();
 
+    // EditorJS.destroy() deletes its own methods; never call destroy twice on the same instance.
     if (editor) {
-      editor.destroy();
+      const prev = editor;
       editor = null;
+      if (typeof prev.destroy === 'function') {
+        try {
+          prev.destroy();
+        } catch {
+          // already torn down or mid-destroy from a concurrent reinit
+        }
+      }
     }
 
     const config = buildToolConfig();
+
+    // Must run before EditorJS so our capture listener beats DragNDrop.processDrop
+    // (which deletes the selection then crashes in processHTML on text DnD).
+    wireEditorJsNativeDropGuard(holder);
 
     editor = new EditorJSCtor({
       // Pass the element — string IDs fail under LWC shadow DOM (getElementById).
@@ -2161,6 +2369,11 @@ export function createEditor(options: any = {}) {
     }
     const saved = await editor.save();
     registry.setBlocks(saved.blocks ?? []);
+    // Re-attach image data URLs from live thumbs (dataset only keeps a compact stub under LWS).
+    for (const block of saved.blocks ?? []) {
+      if (block?.type !== 'documentSection' || !block.data) continue;
+      block.data.fieldValues = recoverImageValuesFromDom(holder, block.data.fieldValues ?? {});
+    }
     const doc: any = {
       time: saved.time,
       fieldSchemas: registry.getFieldSchemas(),
@@ -2921,26 +3134,42 @@ export function createEditor(options: any = {}) {
     },
 
     async setDesignMode(enabled: any) {
-      if (typeof propertiesPanel?.flush === 'function') {
-        try {
-          await propertiesPanel.flush();
-        } catch {
-          // keep switching mode even if properties save fails
-        }
+      if (setDesignModeInFlight) {
+        await setDesignModeInFlight;
       }
-      if (editor) {
-        try {
-          await editor.isReady;
-          await editor.save();
-        } catch {
-          // editor not ready
+      const run = (async () => {
+        if (typeof propertiesPanel?.flush === 'function') {
+          try {
+            await propertiesPanel.flush();
+          } catch {
+            // keep switching mode even if properties save fails
+          }
         }
-      }
-      designMode = !!enabled;
-      applyDesignMode(designMode);
-      syncDesignChromeVisibility();
-      const doc = await getDocument();
-      initEditor(doc);
+        if (editor) {
+          try {
+            await editor.isReady;
+            await editor.save();
+          } catch {
+            // editor not ready
+          }
+        }
+        designMode = !!enabled;
+        applyDesignMode(designMode);
+        syncDesignChromeVisibility();
+        const doc = await getDocument();
+        initEditor(doc);
+        if (editor) {
+          try {
+            await editor.isReady;
+          } catch {
+            // ignore
+          }
+        }
+      })();
+      setDesignModeInFlight = run.finally(() => {
+        if (setDesignModeInFlight === run) setDesignModeInFlight = null;
+      });
+      await setDesignModeInFlight;
     },
 
     getDesignMode: () => designMode,
@@ -3036,6 +3265,9 @@ export function createEditor(options: any = {}) {
     },
 
     async openFieldMapping(options: any = {}) {
+      if (!fieldMappingModal) {
+        throw new Error('Field mapping editor is not available in this editor.');
+      }
       const spec = options.spec ?? documentFieldMapping ?? normalizeFieldMappingSpec(null);
       const saved = await fieldMappingModal.open({
         spec,
@@ -3066,8 +3298,17 @@ export function createEditor(options: any = {}) {
       holder.removeEventListener('keydown', onDesignStructureDeleteKeyDown, true);
       document.removeEventListener('keydown', onDesignStructureDeleteKeyDown, true);
       holder.removeEventListener('click', onDesignHolderClick);
-      editor?.destroy();
-      editor = null;
+      if (editor) {
+        const prev = editor;
+        editor = null;
+        if (typeof prev.destroy === 'function') {
+          try {
+            prev.destroy();
+          } catch {
+            // ignore
+          }
+        }
+      }
       topChrome?.remove();
       designToolbarWrap?.remove();
       if (designEditorScroll?.contains(holder) && designShell?.centerPanel) {

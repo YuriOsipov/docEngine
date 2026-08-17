@@ -509,7 +509,8 @@ export function createSchemaEditorController({
     }
 
     const handler = getFieldHandler(schema.type);
-    if (typeof handler?.renderSchemaFields === 'function') {
+    // Computed keeps a custom formula UI; its handler only appends display-format fields.
+    if (typeof handler?.renderSchemaFields === 'function' && schema.type !== 'computed') {
       handler.renderSchemaFields(extra, schema, {
         catalogs: catalogs(),
         editorContext,
@@ -578,6 +579,13 @@ export function createSchemaEditorController({
         excludeFieldId: currentFieldId,
         getFormulaTextarea: () => body.querySelector('[data-field="formula"]'),
       });
+      if (typeof handler?.renderSchemaFields === 'function') {
+        handler.renderSchemaFields(extra, schema, {
+          catalogs: catalogs(),
+          editorContext,
+          currentFieldId,
+        });
+      }
     } else if (schema.type === 'table') {
       extra.innerHTML = `
         <label class="schema-form__row">

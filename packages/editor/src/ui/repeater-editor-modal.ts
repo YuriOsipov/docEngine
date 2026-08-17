@@ -1,4 +1,5 @@
 import { wireModalEscape } from './wire-modal-escape.js';
+import { FIELD_PICKER_POSITION_COOKIE, wireModalMove } from './wire-modal-move.js';
 
 /**
  * Modal hosting a nested document editor instance.
@@ -24,6 +25,14 @@ export function createRepeaterEditorModal({ getEditorOptions }: any = {}) {
   `;
 
   document.body.appendChild(overlay);
+
+  const modalEl = overlay.querySelector('.modal') as HTMLElement | null;
+  if (modalEl) {
+    wireModalMove(modalEl, {
+      cookieKey: FIELD_PICKER_POSITION_COOKIE,
+      handle: overlay.querySelector('.repeater-editor-modal__header') as HTMLElement | null,
+    });
+  }
 
   const header = overlay.querySelector('.repeater-editor-modal__header');
   const mount = overlay.querySelector('.repeater-editor-modal__mount');

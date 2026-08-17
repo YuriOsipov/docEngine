@@ -7,6 +7,8 @@ let caretPositionAfterFieldToken: any;
 let FIELD_TOKEN_CARET_ANCHOR: any;
 let isCaretAnchorOnlyTextNode: any;
 let ensureCaretAnchorAfter: any;
+let ensureFieldTokenCaretAnchors: any;
+let insertElementAfterPreservingCaretBridge: any;
 let getFieldTokensForClipboard: any;
 let normalizeEditableLineStructure: any;
 let insertPlainTextAtCaret: any;
@@ -73,6 +75,8 @@ before(async () => {
   FIELD_TOKEN_CARET_ANCHOR = inline.FIELD_TOKEN_CARET_ANCHOR;
   isCaretAnchorOnlyTextNode = inline.isCaretAnchorOnlyTextNode;
   ensureCaretAnchorAfter = inline.ensureCaretAnchorAfter;
+  ensureFieldTokenCaretAnchors = inline.ensureFieldTokenCaretAnchors;
+  insertElementAfterPreservingCaretBridge = inline.insertElementAfterPreservingCaretBridge;
   normalizeEditableLineStructure = inline.normalizeEditableLineStructure;
   insertPlainTextAtCaret = inline.insertPlainTextAtCaret;
 
@@ -146,6 +150,99 @@ describe('field-token caret bridge', () => {
     const bridge = ensureCaretAnchorAfter(icd);
     assert.equal(bridge.textContent, `${FIELD_TOKEN_CARET_ANCHOR}.\nClinical diagnosis: `);
     assert.equal(clinical.nextSibling?.textContent, '.');
+  });
+
+  it('insert after a field does not steal its caret bridge', () => {
+    const body = buildSectionBody();
+    const first = createFieldToken('main_list', '', 'List', {});
+    const second = createFieldToken('main_list_2', '', 'List', {});
+    body.appendChild(first);
+    ensureCaretAnchorAfter(first);
+    assert.ok(isCaretAnchorOnlyTextNode(first.nextSibling));
+
+    insertElementAfterPreservingCaretBridge(first, second);
+    ensureFieldTokenCaretAnchors(body);
+
+    assert.ok(isCaretAnchorOnlyTextNode(first.nextSibling), 'bridge remains after first field');
+    assert.equal(first.nextSibling?.nextSibling, second);
+    assert.ok(isCaretAnchorOnlyTextNode(second.nextSibling), 'bridge exists after second field');
+  });
+
+  it('repairs adjacent field tokens that lost their bridge', () => {
+    const body = buildSectionBody();
+    const first = createFieldToken('a', '', 'A', {});
+    const second = createFieldToken('b', '', 'B', {});
+    body.appendChild(first);
+    body.appendChild(second);
+    assert.equal(first.nextSibling, second);
+
+    ensureFieldTokenCaretAnchors(body);
+
+    assert.ok(isCaretAnchorOnlyTextNode(first.nextSibling));
+    assert.equal(first.nextSibling?.nextSibling, second);
+    assert.ok(isCaretAnchorOnlyTextNode(second.nextSibling));
+  });
+
+  it('detects Backspace that would delete a caret bridge between fields', async () => {
+    const kb = await import('./field-keyboard.js');
+    const body = buildSectionBody();
+    const first = createFieldToken('a', '', 'A', {});
+    const second = createFieldToken('b', '', 'B', {});
+    body.appendChild(first);
+    const bridge = ensureCaretAnchorAfter(first);
+    body.appendChild(second);
+    ensureCaretAnchorAfter(second);
+
+    const atEnd: any = {
+      startContainer: bridge,
+      startOffset: 1,
+      collapsed: true,
+    };
+    assert.equal(kb.findStandaloneCaretBridgeTargetedByDelete(atEnd, 'backward'), bridge);
+    assert.equal(kb.findStandaloneCaretBridgeTargetedByDelete(atEnd, 'forward'), null);
+
+    const atStart: any = {
+      startContainer: bridge,
+      startOffset: 0,
+      collapsed: true,
+    };
+    assert.equal(kb.findStandaloneCaretBridgeTargetedByDelete(atStart, 'forward'), bridge);
+  });
+
+  it('keeps caret bridges when Backspace-joining a field to the caret', async () => {
+    const kb = await import('./field-keyboard.js');
+    const body = buildSectionBody();
+    const first = createFieldToken('a', '', 'A', {});
+    const second = createFieldToken('b', '', 'B', {});
+    const spacer = document.createTextNode('x');
+    body.appendChild(first);
+    ensureCaretAnchorAfter(first);
+    body.appendChild(spacer);
+    body.appendChild(second);
+    ensureCaretAnchorAfter(second);
+
+    const insertPoint = document.createTextNode('');
+    body.insertBefore(insertPoint, spacer.nextSibling);
+    const range: any = {
+      collapsed: true,
+      startContainer: insertPoint,
+      startOffset: 0,
+      endContainer: insertPoint,
+      endOffset: 0,
+      commonAncestorContainer: body,
+      cloneRange() {
+        return this;
+      },
+      insertNode(node: any) {
+        body.insertBefore(node, insertPoint);
+      },
+    };
+
+    kb.moveFieldTokenToCaret(second, range, null);
+
+    assert.ok(isCaretAnchorOnlyTextNode(first.nextSibling), 'bridge after first');
+    assert.ok(second.isConnected, 'joined field still in body');
+    assert.ok(isCaretAnchorOnlyTextNode(second.nextSibling), 'bridge after joined field');
   });
 });
 

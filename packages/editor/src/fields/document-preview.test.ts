@@ -46,6 +46,9 @@ before(async () => {
     }
   };
 
+  const { registerBuiltinFields } = await import('./handlers/index.js');
+  registerBuiltinFields();
+
   const preview = await import('./document-preview.js');
   filterSegmentsForPreview = preview.filterSegmentsForPreview;
   renderDocumentPreview = preview.renderDocumentPreview;
@@ -811,5 +814,163 @@ describe('renderDocumentPreview', () => {
     assert.equal(root.querySelector('.document-section__label-text'), null);
     assert.doesNotMatch(root.textContent ?? '', /Anamnesis/);
     assert.match(root.textContent ?? '', /Headache/);
+  });
+
+  it('applies top and bottom border classes when borderTop/borderBottom are set', () => {
+    const doc = {
+      fieldSchemas: {
+        vitals: { type: 'text', name: 'Vitals' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Vitals',
+            hideTitleInPreview: true,
+            borderTop: true,
+            borderBottom: true,
+            segments: [{ type: 'field', id: 'vitals' }],
+            fieldValues: { vitals: '120/80' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    const wrap = root.querySelector('.preview-document__section-wrap');
+    assert.ok(wrap);
+    assert.ok(wrap?.classList.contains('document-section--border-top'));
+    assert.ok(wrap?.classList.contains('document-section--border-bottom'));
+  });
+
+  it('renders image fields from fieldValues data URLs in HTML preview', () => {
+    const dataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const doc = {
+      fieldSchemas: {
+        logo_logo: { type: 'image', name: 'logo', label: 'logo', maxWidth: 320 },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'logo',
+            hideTitleInPreview: true,
+            segments: [{ type: 'field', id: 'logo_logo' }],
+            fieldValues: { logo_logo: { url: dataUrl, caption: '' } },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc);
+    const img = root.querySelector('img.field-token__thumb') as HTMLImageElement | null;
+    assert.ok(img, 'preview should include the image thumb');
+    assert.equal(img?.getAttribute('src') || img?.src, dataUrl);
+    assert.equal(img?.getAttribute('width'), '320');
+    assert.doesNotMatch(root.textContent ?? '', /^logo$/);
+  });
+
+  it('renders bullet and inline list field values in document preview', () => {
+    const doc = {
+      fieldSchemas: {
+        painAreas: {
+          type: 'list',
+          name: 'Pain areas',
+          label: 'Areas of pain',
+          itemLayout: 'bullet',
+          items: [
+            { id: 'pain-neck', label: 'Neck pain' },
+            { id: 'pain-head', label: 'Headaches' },
+          ],
+        },
+        postImpact: {
+          type: 'list',
+          name: 'Post-impact',
+          label: 'Immediately after impact',
+          itemLayout: 'inline',
+          items: [
+            { id: 'pi-no-loc', label: 'No loss of consciousness' },
+            { id: 'pi-no-er', label: 'Did not go to ER' },
+          ],
+        },
+        imaging: {
+          type: 'list',
+          name: 'Imaging',
+          label: 'Imaging referred',
+          itemLayout: 'bullet',
+          items: [
+            { id: 'img-mri-l', label: 'MRI Lumbar Spine' },
+            { id: 'img-mri-r-sh', label: 'MRI Right Shoulder' },
+          ],
+        },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Accident',
+            segments: [
+              { type: 'text', content: 'Immediately after impact: ' },
+              { type: 'field', id: 'postImpact' },
+              { type: 'text', content: '\nPain areas: ' },
+              { type: 'field', id: 'painAreas' },
+              { type: 'text', content: '\nImaging: ' },
+              { type: 'field', id: 'imaging' },
+            ],
+            fieldValues: {
+              postImpact: ['No loss of consciousness', 'Did not go to ER'],
+              painAreas: ['Neck pain', 'Headaches'],
+              imaging: ['MRI Right Shoulder', 'MRI Lumbar Spine'],
+            },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    const text = root.textContent ?? '';
+    assert.match(text, /No loss of consciousness;\s*Did not go to ER/);
+    assert.match(text, /•\s*Neck pain/);
+    assert.match(text, /•\s*Headaches/);
+    assert.match(text, /•\s*MRI Right Shoulder/);
+    assert.match(text, /•\s*MRI Lumbar Spine/);
+  });
+
+  it('resolves choice default ids to labels in document preview', () => {
+    const doc = {
+      fieldSchemas: {
+        causation: {
+          type: 'choice',
+          name: 'Causation',
+          label: 'Causation opinion',
+          defaultValue: 'causation-yes',
+          items: [
+            {
+              id: 'causation-yes',
+              label: 'Injuries are directly and proximately caused by the accident noted above',
+            },
+          ],
+        },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Assessment',
+            segments: [
+              { type: 'text', content: 'Causation: ' },
+              { type: 'field', id: 'causation' },
+            ],
+            fieldValues: { causation: '' },
+          },
+        },
+      ],
+    };
+
+    const root = renderDocumentPreview(doc, { hideEmptyValues: false });
+    const text = root.textContent ?? '';
+    assert.match(text, /Injuries are directly and proximately caused/);
+    assert.doesNotMatch(text, /causation-yes/);
   });
 });

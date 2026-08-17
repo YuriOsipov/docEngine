@@ -118,6 +118,15 @@ describe('field handler registry', () => {
           currencyCode: 'EUR',
           fractionDigits: 2,
         },
+        sum: {
+          type: 'computed',
+          label: 'Sum',
+          name: 'Sum',
+          formula: '{a}+{b}',
+          displayFormat: 'number',
+          fractionDigits: 2,
+          suffix: ' kg',
+        },
       },
     };
     assert.equal(formatFieldDisplay('age', '42', 'Age', ctx), '42y');
@@ -129,7 +138,26 @@ describe('field handler registry', () => {
         fractionDigits: 2,
       }),
     );
+    assert.equal(
+      formatFieldDisplay('sum', '12.5', 'Sum', ctx),
+      formatNumericDisplay(12.5, {
+        displayFormat: 'number',
+        fractionDigits: 2,
+        suffix: ' kg',
+      }),
+    );
     assert.equal(getFieldHandler('text')?.pdfRenderMode?.({ htmlEditor: true }), 'html');
+  });
+
+  it('computed createSchema includes display format defaults', () => {
+    const schema = createDefaultSchema('computed', 'Total');
+    assert.equal(schema.type, 'computed');
+    assert.equal(schema.displayFormat, 'plain');
+    assert.equal(schema.currencyCode, 'EUR');
+    assert.equal(schema.suffix, '');
+    const display = schemaToDisplayConfig(schema);
+    assert.equal(display.displayFormat, 'plain');
+    assert.equal(display.currencyCode, 'EUR');
   });
 
   it('allows registering a host field plugin', () => {

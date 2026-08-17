@@ -175,6 +175,36 @@ describe('previewDomToPdfContent', () => {
     assert.equal(fieldPart?.font, 'Roboto');
   });
 
+  it('emits canvas rules for section borderTop/borderBottom classes', () => {
+    const root = document.createElement('div');
+    root.className = 'preview-document';
+
+    const wrap = document.createElement('div');
+    wrap.className =
+      'preview-document__section-wrap document-section--border-top document-section--border-bottom';
+
+    const body = document.createElement('div');
+    body.className = 'preview-document__section document-section__body';
+    body.textContent = 'Header content';
+    wrap.appendChild(body);
+    root.appendChild(wrap);
+
+    const content = previewDomToPdfContent(root, {
+      resolveFontName: fontRegistry.resolveFontName,
+      defaultFont: fontRegistry.defaultFont,
+      baseFontSize: 12,
+    });
+
+    assert.equal(content.length, 1);
+    const stack = content[0].stack as any[];
+    const canvasNodes = stack.filter((node: any) => Array.isArray(node.canvas));
+    assert.equal(canvasNodes.length, 2);
+    assert.equal(canvasNodes[0].canvas[0].lineColor, '#000000');
+    assert.equal(canvasNodes[0].canvas[0].lineWidth, 1);
+    assert.equal(canvasNodes[1].canvas[0].lineColor, '#000000');
+    assert.match(nodeTextJoined(content[0]), /Header content/);
+  });
+
   it('preserves intentional field underline from displayStyle in PDF', () => {
     const root = document.createElement('div');
     root.className = 'preview-document';

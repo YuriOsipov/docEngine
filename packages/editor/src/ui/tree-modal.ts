@@ -9,6 +9,7 @@ import {
 } from '../fields/manual-field-values.js';
 import { wireModalEscape } from './wire-modal-escape.js';
 import { wireModalResize } from './wire-modal-resize.js';
+import { FIELD_PICKER_POSITION_COOKIE, wireModalMove } from './wire-modal-move.js';
 import {
   FIELD_TREE_PICKER_FOOTER_HINT_HTML,
   FIELD_MODAL_OVERLAY_CLASS,
@@ -73,9 +74,17 @@ function subtreeHasMatch(node: any,ancestors: any,query: any) {
   return false;
 }
 
+function isTreePickerOverlay(el: Element) {
+  return [...el.children].some((child) => child.classList?.contains('modal--tree'));
+}
+
 export function createTreeModal({ parent = null }: { parent?: HTMLElement | null } = {}) {
+  // Only remove *tree picker* overlays. A field-mapping overlay can contain a
+  // leftover nested tree dialog after the mapping editor closes; matching any
+  // descendant `.modal--tree` would delete the mapping overlay itself and
+  // prevent opening Mapping a second time.
   document.querySelectorAll('.modal-overlay').forEach((el) => {
-    if (el.querySelector('.modal--tree')) el.remove();
+    if (isTreePickerOverlay(el)) el.remove();
   });
 
   const overlay = document.createElement('div');
@@ -110,6 +119,7 @@ export function createTreeModal({ parent = null }: { parent?: HTMLElement | null
 
   const modalEl = overlay.querySelector('.modal');
   wireModalResize(modalEl, { cookieKey: 'tree-picker' });
+  wireModalMove(modalEl, { cookieKey: FIELD_PICKER_POSITION_COOKIE });
 
   const header = overlay.querySelector('.modal__header');
   const searchInput = overlay.querySelector('.modal__search');

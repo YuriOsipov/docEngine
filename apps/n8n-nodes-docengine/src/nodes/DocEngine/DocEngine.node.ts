@@ -2,9 +2,9 @@
 import {
   assertTemplate,
   buildFullDocumentExport,
-  getByPath,
   parseJsonText,
   renderDocument,
+  resolveInputValues,
   resolveTemplateFromItem,
 } from './docengine-utils.js';
 import type { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
@@ -31,8 +31,7 @@ function loadTemplate(ctx: IExecuteFunctions, item: INodeExecutionData, itemInde
  */
 function extractInputValues(ctx, item, itemIndex) {
   const valuesJsonPath = ctx.getNodeParameter('valuesJsonPath', itemIndex, '');
-  const raw = getByPath(valuesJsonPath, item.json ?? {});
-  return raw ?? item.json ?? {};
+  return resolveInputValues(valuesJsonPath, item.json ?? {});
 }
 
 export class DocEngine {
@@ -93,13 +92,16 @@ export class DocEngine {
           },
         },
         {
-          displayName: 'Values JSON Path',
+          displayName: 'Values JSON / Path',
           name: 'valuesJsonPath',
           type: 'string',
+          typeOptions: {
+            rows: 5,
+          },
           default: '',
-          placeholder: 'body',
+          placeholder: 'sections',
           description:
-            'Dot-path into the incoming JSON item for field values or source payload. Leave empty to use the whole item JSON.',
+            'Field values to bind onto the template. A JSON object (n8n expressions / JS allowed), a dot-path into the incoming item (e.g. sections), or empty to use the whole item. When Template Source is Stored in Node, pass values only — not a previous PDF/document payload.',
         },
         {
           displayName: 'Use Template Field Mapping',

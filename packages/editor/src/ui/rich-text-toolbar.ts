@@ -36,6 +36,14 @@ const ALIGN_COMMANDS = [
   { command: 'justifyRight', title: 'Align right' },
 ];
 
+const ALIGN_BY_COMMAND = {
+  justifyLeft: 'left',
+  justifyCenter: 'center',
+  justifyRight: 'right',
+};
+
+const FIELD_ALIGN_COMMANDS = new Set(Object.keys(ALIGN_BY_COMMAND));
+
 function createIconButton({ command, title: btnTitle }: any) {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -163,6 +171,7 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
   for (const item of ALIGN_COMMANDS) {
     const btn = createIconButton(item);
     alignButtons.push(btn);
+    commandButtons.set(item.command, btn);
     alignGroup.appendChild(btn);
   }
 
@@ -239,6 +248,9 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
       'strikeThrough',
       resolved.textDecoration === 'line-through',
     );
+    setCommandButtonActive('justifyLeft', resolved.textAlign === 'left');
+    setCommandButtonActive('justifyCenter', resolved.textAlign === 'center');
+    setCommandButtonActive('justifyRight', resolved.textAlign === 'right');
 
     setFontSelectValue(fontSelect, fontCustomInput, resolved.fontFamily ?? '');
     setFontSizeSpinValue(sizeInput, resolved.fontSize ?? '');
@@ -277,7 +289,7 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
         btn.disabled = true;
       }
     }
-    setAlignControlsVisible(false);
+    setAlignControlsVisible(enabled, enabled);
     fontSelect.disabled = !enabled;
     sizeInput.disabled = !enabled;
     applyBtn.disabled = !enabled;
@@ -287,6 +299,7 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
       fontSelect.value = '';
       setFontSizeSpinValue(sizeInput, '');
       for (const btn of buttons) btn.classList.remove('rich-text-toolbar__btn--active');
+      for (const btn of alignButtons) btn.classList.remove('rich-text-toolbar__btn--active');
     } else if (fontSelect.value === '__custom__') {
       fontCustomInput.disabled = false;
     }
@@ -382,9 +395,14 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
         'line-through',
         'none',
       );
+    } else if (FIELD_ALIGN_COMMANDS.has(command)) {
+      const align = ALIGN_BY_COMMAND[command];
+      override = toggleDisplayStyleProperty(override, globalDefault, 'textAlign', align);
+    } else {
+      return;
     }
 
-    fieldMode.onStyleChange?.(override);
+    fieldMode.onStyleChange?.(normalizeFieldDisplayStyle(override));
     refreshFieldModeControls();
   }
 
@@ -407,7 +425,7 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
     const command = btn.dataset.command;
 
     if (fieldMode) {
-      if (FIELD_STYLE_COMMANDS.has(command)) {
+      if (FIELD_STYLE_COMMANDS.has(command) || FIELD_ALIGN_COMMANDS.has(command)) {
         applyFieldStyleCommand(command);
       }
       return;
@@ -482,6 +500,7 @@ export function createRichTextToolbar({ onPreview = null }: { onPreview?: (() =>
     bar.classList.remove('rich-text-toolbar--field-style');
     setTextModeHint();
     for (const btn of buttons) btn.classList.remove('rich-text-toolbar__btn--active');
+    for (const btn of alignButtons) btn.classList.remove('rich-text-toolbar__btn--active');
   }
 
   function clearActive() {

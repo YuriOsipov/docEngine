@@ -15,7 +15,7 @@ export async function generateDocumentPdfBlobFromPreview() {
   );
 }
 
-export function mapEditorPdfOptions(doc, editorOptions = {}) {
+export function mapEditorPdfOptions(doc: any, editorOptions: any = {}) {
   return { pageSetup: doc?.pageSetup ?? {}, ...editorOptions };
 }
 

@@ -257,6 +257,17 @@ export interface RepeaterFieldSchema extends FieldSchemaBase {
 export interface ComputedFieldSchema extends FieldSchemaBase {
   type: 'computed';
   formula: string;
+  /** Unit text appended for plain/number display (e.g. mmHg). Not stored in the value. */
+  suffix?: string;
+  /**
+   * How the computed result is shown in the document / PDF.
+   * Same options as Number (`integer`) fields.
+   */
+  displayFormat?: 'plain' | 'number' | 'currency';
+  /** ISO 4217 code when `displayFormat` is `currency`. Default: `EUR`. */
+  currencyCode?: string;
+  /** Fraction digits for `number` / `currency` display. */
+  fractionDigits?: number;
 }
 
 export type FieldSchema =
@@ -363,6 +374,10 @@ export interface DocumentSectionData {
   repeatable?: boolean;
   /** When true, the section title is omitted from document preview (and preview-first PDF). */
   hideTitleInPreview?: boolean;
+  /** When true, draw a horizontal rule above the section (editor + preview/PDF). */
+  borderTop?: boolean;
+  /** When true, draw a horizontal rule below the section (editor + preview/PDF). */
+  borderBottom?: boolean;
   /** Optional rule that controls whether the section is visible for current field values. */
   visibility?: SectionVisibilityRule | null;
   segments: Segment[];
@@ -546,9 +561,28 @@ export interface CatalogProvider {
   resolveSchemaTree(schema: FieldSchema): TreeNode[];
 }
 
+export interface ImageUploadFileResult {
+  success: 1;
+  file: { url: string; name?: string; stub?: boolean };
+}
+
+export interface ExistingImageItem {
+  id: string;
+  name: string;
+  url?: string;
+  extension?: string;
+}
+
 export interface ImageUploadConfig {
   uploadUrl?: string;
   stub?: boolean;
+  /** Host-provided uploader (e.g. Salesforce Apex). When set, skips fetch/stub. */
+  uploadByFile?: (file: File) => Promise<ImageUploadFileResult>;
+  uploadByUrl?: (url: string) => Promise<ImageUploadFileResult>;
+  /** Optional browse list of existing host images (e.g. Salesforce Files on the record). */
+  listExistingImages?: () => Promise<ExistingImageItem[]>;
+  /** Resolve a selected existing image id to a persistable URL. */
+  resolveExistingImage?: (id: string) => Promise<ImageUploadFileResult>;
 }
 
 export interface ResolveListItemsContext {
@@ -605,6 +639,8 @@ export interface ImagePickerOptions {
 export interface DatePickerOptions {
   title: string;
   value: string;
+  /** Mount overlay under this host (fill editor shell). */
+  parent?: HTMLElement | null;
 }
 
 export interface PickerCallbacks {
@@ -659,6 +695,21 @@ export interface CreateEditorUiOptions {
   fieldHighlight?: FieldHighlightStyle;
 }
 
+export type FormulaFunctionKind = 'scalar' | 'aggregate';
+
+export type FormulaFunctionArity = number | { min?: number; max?: number };
+
+/** Host/plugin function for computed formulas. See `registerFormulaFunction`. */
+export interface FormulaFunctionDef {
+  name: string;
+  kind?: FormulaFunctionKind;
+  arity?: FormulaFunctionArity;
+  impl: (args: unknown[]) => unknown;
+  label?: string;
+  description?: string;
+  picker?: boolean;
+}
+
 export interface CreateEditorOptions {
   holder: HTMLElement | string;
   data?: EditorDocument;
@@ -694,6 +745,17 @@ export interface CreateEditorOptions {
   /** Fired when Document preview modal opens/closes. */
   onPreviewStateChange?: (open: boolean) => void;
   /**
+   * Fired when a nested field dialog (list/tree/text/… picker) opens/closes.
+   * Hosts such as Salesforce LightningModal should set `disableClose` while true
+   * so Escape closes only the nested dialog, not the editor shell.
+   */
+  onNestedModalStateChange?: (open: boolean) => void;
+  /**
+   * Fired when a nested field picker applies a result (OK / Clear), not when cancelled.
+   * Hosts can use this for unsaved-changes tracking without false positives from open/close.
+   */
+  onFieldPickerApplied?: () => void;
+  /**
    * Host share/email/Slack handler. When set, preview shows a Share button.
    * Receives the current-format artifact from `getPreviewArtifact`.
    */
@@ -718,6 +780,12 @@ export interface CreateEditorOptions {
   visionTableTool?: new (args: { data: unknown; config: EditorToolConfig }) => unknown;
   visionTableFieldId?: string;
   imageUpload?: ImageUploadConfig;
+  /**
+   * Extra computed-formula functions for this process (add or override built-ins).
+   * Same as calling `registerFormulaFunction` before createEditor. n8n / PDF hosts
+   * that evaluate formulas must register the same functions.
+   */
+  formulaFunctions?: FormulaFunctionDef[];
   pickers?: Partial<PickerCallbacks>;
   ui?: CreateEditorUiOptions;
   onChange?: (doc: EditorDocument) => void;
@@ -1011,6 +1079,12 @@ export function allocateFieldIdentity(
   options?: { reservedIds?: Set<string>; reservedNames?: Set<string>; excludeFieldId?: string | null },
 ): { fieldId: string; fieldName: string };
 export function resolveSectionName(data?: DocumentSectionData | Record<string, unknown> | null): string;
+export function collectUsedSectionNames(
+  blocks?: EditorBlock[] | null,
+  options?: { reservedNames?: Set<string> },
+): Set<string>;
+export function allocateUniqueSectionName(usedNames?: Set<string>, baseName?: string): string;
+export const DEFAULT_SECTION_NAME: string;
 export function deriveCellFieldId(tableFieldId: string, rowKey: string, colKey: string): string;
 export function ensureSchemaName(schema: FieldSchema, fallback?: string): FieldSchema;
 export function ensureSchemasHaveName(fieldSchemas?: Record<string, FieldSchema>): Record<string, FieldSchema>;
@@ -1331,6 +1405,16 @@ export function getInlineFieldTypes(): string[];
 export function isInlineFieldType(type: string): boolean;
 export function registerBuiltinFields(): void;
 
+export function registerFormulaFunction(def: FormulaFunctionDef): FormulaFunctionDef;
+export function unregisterFormulaFunction(name: string): boolean;
+export function resetFormulaFunctions(): void;
+export function getFormulaFunction(
+  name: string,
+  overlay?: FormulaFunctionDef[],
+): FormulaFunctionDef | undefined;
+export function listFormulaFunctions(overlay?: FormulaFunctionDef[]): FormulaFunctionDef[];
+export function listFormulaPickerFunctions(overlay?: FormulaFunctionDef[]): FormulaFunctionDef[];
+
 export function applyDesignMode(enabled: boolean): void;
 export function isDesignMode(): boolean;
 export function configureImageUpload(config: ImageUploadConfig): void;
@@ -1415,6 +1499,23 @@ export function openFieldPicker(
   currentValue: FieldValue,
   callbacks: PickerCallbacks & { getRegistry?: () => SchemaRegistry },
 ): Promise<FieldValue>;
+export function pickFillFieldFromToken(
+  token: HTMLElement,
+  callbacks: PickerCallbacks & {
+    getRegistry?: () => SchemaRegistry;
+    editorHolder?: ParentNode;
+    fieldValues?: Record<string, FieldValue>;
+    fieldSchemas?: Record<string, FieldSchema>;
+  },
+  onUpdate?: (fieldId: string, value: FieldValue) => void,
+  options?: {
+    schema?: FieldSchema;
+    placeholder?: string;
+    currentValue?: FieldValue;
+    updateContext?: unknown;
+    root?: ParentNode;
+  },
+): Promise<FieldValue | undefined>;
 
 export function showNotification(
   message: string,
@@ -1422,3 +1523,51 @@ export function showNotification(
 ): void;
 
 export function defineDocEditorElement(tagName?: string): void;
+
+/** Shared fill-mode field dialog used by text, integer, date, and plugins. */
+export function createFieldFormModal<TOpen extends { title?: string; parent?: HTMLElement | null }>(
+  options: {
+    parent?: HTMLElement | null;
+    bodyHtml: string;
+    modalClass?: string;
+    focusSelector?: string;
+    submitOnEnter?: boolean;
+    selectAll?: boolean | ((opts: TOpen) => boolean);
+    getValue: (els: {
+      overlay: HTMLElement;
+      modal: HTMLElement;
+      body: HTMLElement;
+      header: HTMLElement;
+    }) => string;
+    validate?: (
+      els: {
+        overlay: HTMLElement;
+        modal: HTMLElement;
+        body: HTMLElement;
+        header: HTMLElement;
+      },
+      value: string,
+    ) => string | null;
+    onOpen?: (
+      els: {
+        overlay: HTMLElement;
+        modal: HTMLElement;
+        body: HTMLElement;
+        header: HTMLElement;
+      },
+      opts: TOpen,
+    ) => void;
+    onClose?: (els: {
+      overlay: HTMLElement;
+      modal: HTMLElement;
+      body: HTMLElement;
+      header: HTMLElement;
+    }) => void;
+  },
+): {
+  open(opts?: TOpen): Promise<string>;
+  overlay: HTMLElement;
+  modal: HTMLElement;
+  body: HTMLElement;
+  header: HTMLElement;
+};

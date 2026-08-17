@@ -423,4 +423,27 @@ describe('createTreeModal manual edit sync', () => {
     bezCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
     assert.equal(textarea?.value, savedText);
   });
+
+  it('does not remove a parent mapping overlay that contains a leftover nested tree dialog', async () => {
+    const doc = installDom();
+    const mappingOverlay = doc.createElement('div');
+    mappingOverlay.className = 'modal-overlay modal-overlay--field-mapping';
+    mappingOverlay.innerHTML = `
+      <div class="modal modal--field-mapping">
+        <div class="modal-overlay modal-overlay--palette">
+          <div class="modal modal--tree"></div>
+        </div>
+      </div>
+    `;
+    doc.body.appendChild(mappingOverlay);
+
+    const { createTreeModal } = await import('./tree-modal.js');
+    createTreeModal();
+
+    assert.ok(
+      doc.body.contains(mappingOverlay),
+      'field-mapping overlay must survive tree-modal remount',
+    );
+    assert.equal(doc.querySelectorAll('.modal-overlay--field-mapping').length, 1);
+  });
 });

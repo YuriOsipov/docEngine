@@ -4,6 +4,7 @@ import {
   insertLineBreakAtCaret,
   ensureCaretAnchorAfter,
   ensureFieldTokenCaretAnchors,
+  removeTrailingCaretBridge,
   stripFieldTokenCaretAnchors,
   hasLeadingCaretAnchor,
   caretPositionAfterFieldToken,
@@ -16,6 +17,13 @@ import {
   getSelectedFieldTokens,
   sortTokensByDocumentOrder,
 } from './field-selection.js';
+import {
+  collectEditableFillFieldTokens,
+  getFocusedFillFieldToken,
+  isFillModalOverlayOpen,
+  moveFillFieldFocus,
+  resolveFillFocusHolder,
+} from './fill-field-focus.js';
 
 function isFieldToken(node: any) {
   return node?.nodeType === Node.ELEMENT_NODE && node.classList?.contains('field-token');
@@ -128,7 +136,7 @@ function mergeLineBackwardAtCaret(container: any, range: any) {
   return true;
 }
 
-function getCollapsedCaretRange(container: any) {
+export function getCollapsedCaretRange(container: any) {
   const sel = window.getSelection();
   if (!sel?.rangeCount || !sel.isCollapsed) return null;
 
@@ -432,6 +440,9 @@ function stopArrowEvent(e: any) {
 }
 
 function normalizeCollapsedCaret(container: any) {
+  // Self-heal after drag/drop or paste left adjacent field tokens without a ZWSP.
+  ensureFieldTokenCaretAnchors(container);
+
   const range = getCollapsedCaretRange(container);
   if (!range) return;
 
@@ -667,12 +678,56 @@ function handleArrowNavigation(range: any, direction: any, container: any) {
   return false;
 }
 
-function moveFieldTokenToCaret(token: any, range: any, bridgeBr: any) {
+export function moveFieldTokenToCaret(token: any, range: any, bridgeBr: any) {
   bridgeBr?.remove();
   const insertRange = range.cloneRange();
+  const editableRoot =
+    token.parentElement?.closest?.('[contenteditable="true"]') ?? token.parentElement;
+  removeTrailingCaretBridge(token);
   token.remove();
   insertRange.insertNode(token);
+  if (editableRoot) ensureFieldTokenCaretAnchors(editableRoot);
+  else ensureCaretAnchorAfter(token);
   focusCaretAfter(token);
+}
+
+/**
+ * Backspace at the end of a ZWSP bridge (or Delete at its start) would remove the
+ * only caret landing spot between contenteditable=false field tokens.
+ */
+export function findStandaloneCaretBridgeTargetedByDelete(range: any, direction: any) {
+  const node = range?.startContainer;
+  if (!node || node.nodeType !== Node.TEXT_NODE || !isCaretAnchorTextNode(node)) {
+    return null;
+  }
+  if (direction === 'backward') {
+    return range.startOffset > 0 ? node : null;
+  }
+  return range.startOffset === 0 ? node : null;
+}
+
+/** Keep the bridge; step the caret across it instead of deleting it. */
+function preserveCaretBridgeOnDelete(range: any, direction: any, container: any) {
+  const bridge = findStandaloneCaretBridgeTargetedByDelete(range, direction);
+  if (!bridge) return false;
+
+  if (direction === 'backward') {
+    // Sit at offset 0 so the next Backspace can delete the preceding field.
+    focusCaretAtFieldBridge(bridge);
+    return true;
+  }
+
+  const after = skipBridgeNodes(bridge.nextSibling, 'forward', container);
+  if (isFieldToken(after)) {
+    focusCaretAfter(after);
+    return true;
+  }
+  if (after?.nodeType === Node.TEXT_NODE) {
+    focusCaretInText(after, caretPositionAfterFieldToken(after));
+    return true;
+  }
+  focusCaretAtFieldBridge(bridge);
+  return true;
 }
 
 function isTableCellToken(token: any) {
@@ -681,10 +736,7 @@ function isTableCellToken(token: any) {
 
 function deleteFieldToken(token: any, onDeleteField: any, onStructureChange: any) {
   if (!token?.isConnected || isTableCellToken(token)) return;
-  const bridge = token.nextSibling;
-  if (isCaretAnchorTextNode(bridge)) {
-    bridge.remove();
-  }
+  removeTrailingCaretBridge(token);
   onDeleteField?.(token.dataset.fieldId, token);
   token.remove();
   onStructureChange?.();
@@ -879,8 +931,58 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
 
   ensureFieldTokenCaretAnchors(container);
 
+  function getFillFocusSchemas() {
+    return options.getRegistry?.()?.getFieldSchemas?.() ?? options.fieldSchemas ?? {};
+  }
+
+  function handleFillFieldFocusKeys(e: any) {
+    if (designMode) return false;
+    if (shouldIgnoreFieldDeleteKey(e.target)) return false;
+    if (isFillModalOverlayOpen()) return false;
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+
+    const holder = resolveFillFocusHolder(container, options);
+    const getSchemas = () => getFillFocusSchemas();
+
+    if (e.key === 'Tab') {
+      const tokens = collectEditableFillFieldTokens(holder, getSchemas);
+      if (!tokens.length) return false;
+      const moved = moveFillFieldFocus(holder, e.shiftKey ? -1 : 1, getSchemas);
+      if (!moved) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      return true;
+    }
+
+    if ((e.key === 'Enter' || e.key === ' ') && !e.shiftKey) {
+      const focused = getFocusedFillFieldToken(holder);
+      if (!focused || !options.onActivateFillField) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      void options.onActivateFillField(focused);
+      return true;
+    }
+
+    return false;
+  }
+
   function handleSelectionChange() {
     normalizeCollapsedCaret(container);
+  }
+
+  function handleInput(e: any) {
+    // Native deletes can still collapse bridges (e.g. selecting ZWSP+text). Re-anchor.
+    if (
+      e.inputType === 'deleteContentBackward' ||
+      e.inputType === 'deleteContentForward' ||
+      e.inputType === 'deleteByCut' ||
+      e.inputType === 'deleteByDrag' ||
+      e.inputType === 'historyUndo' ||
+      e.inputType === 'historyRedo'
+    ) {
+      ensureFieldTokenCaretAnchors(container);
+      normalizeCollapsedCaret(container);
+    }
   }
 
   function handleBeforeInput(e: any) {
@@ -921,6 +1023,11 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
       if (!range) return;
 
       const direction = e.inputType === 'deleteContentForward' ? 'forward' : 'backward';
+      if (preserveCaretBridgeOnDelete(range, direction, container)) {
+        e.preventDefault();
+        return;
+      }
+
       if (
         direction === 'backward' &&
         tryDeleteTrailingFieldOnBackwardDelete(range, container, { onDeleteField, onStructureChange })
@@ -949,6 +1056,11 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
     if (!range) return;
 
     const direction = e.inputType === 'deleteContentForward' ? 'forward' : 'backward';
+
+    if (preserveCaretBridgeOnDelete(range, direction, container)) {
+      e.preventDefault();
+      return;
+    }
 
     if (shouldBlockFillModeFieldDelete(container, range, direction, protectFields)) {
       e.preventDefault();
@@ -1005,6 +1117,8 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
   }
 
   function handleKeyDown(e: any) {
+    if (handleFillFieldFocusKeys(e)) return;
+
     if (
       (e.key === 'ArrowRight' || e.key === 'ArrowLeft') &&
       !e.ctrlKey &&
@@ -1033,13 +1147,14 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       if (shouldIgnoreFieldDeleteKey(e.target)) return;
 
-      const sel = window.getSelection();
-      if (!sel?.rangeCount) return;
-      const anchor = sel.anchorNode;
-      if (!container.contains(anchor)) return;
-      if (anchor?.parentElement?.closest?.('.field-token')) return;
+      // Use the nested-aware caret range so the section body does not also
+      // insert a <br> when Enter is pressed inside a column cell.
+      const range = getCollapsedCaretRange(container);
+      if (!range) return;
+      if (range.startContainer?.parentElement?.closest?.('.field-token')) return;
 
       e.preventDefault();
+      e.stopPropagation();
       insertLineBreakAtCaret(container);
       normalizeEditableLineStructure(container);
       onStructureChange?.();
@@ -1114,6 +1229,7 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
   }
 
   container.addEventListener('beforeinput', handleBeforeInput);
+  container.addEventListener('input', handleInput);
   container.addEventListener('cut', handleCut);
   container.addEventListener('click', handleSelectionChange);
   container.addEventListener('keydown', handleKeyDown, true);
@@ -1121,6 +1237,7 @@ export function wireFieldTokenKeyboard(container: any, options: any = {}) {
 
   return () => {
     container.removeEventListener('beforeinput', handleBeforeInput);
+    container.removeEventListener('input', handleInput);
     container.removeEventListener('cut', handleCut);
     container.removeEventListener('click', handleSelectionChange);
     container.removeEventListener('keydown', handleKeyDown, true);

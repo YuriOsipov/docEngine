@@ -1,4 +1,4 @@
-﻿import { primaryFontFamily } from './fonts-registry.js';
+import { primaryFontFamily } from './fonts-registry.js';
 import { cssFontSizeToPdfPt, DEFAULT_BODY_FONT_PT, cssFontWeightToPdfBold } from './style-mapper.js';
 import {
   parseCssColor,
@@ -214,19 +214,31 @@ export function serializePreviewBodyHtml(bodyEl: any, ctx: PdfCtx = {} as PdfCtx
   return clone.innerHTML;
 }
 
-function buildHorizontalRuleBlock(): Record<string, any> {
+function buildHorizontalRuleBlock(options: { lineColor?: string; lineWidth?: number; margin?: number[] } = {}): Record<string, any> {
+  const lineColor = options.lineColor ?? '#cccccc';
+  const lineWidth = options.lineWidth ?? 0.5;
+  const margin = options.margin ?? [0, 6, 0, 6];
   return {
-    margin: [0, 6, 0, 6],
+    margin,
     canvas: [{
       type: 'line',
       x1: 0,
       y1: 0,
       x2: 515,
       y2: 0,
-      lineWidth: 0.5,
-      lineColor: '#cccccc',
+      lineWidth,
+      lineColor,
     }],
   };
+}
+
+/** Matches `.document-section--border-top` / `--border-bottom` preview CSS. */
+function buildSectionBorderRuleBlock(side: 'top' | 'bottom'): Record<string, any> {
+  return buildHorizontalRuleBlock({
+    lineColor: '#000000',
+    lineWidth: 1,
+    margin: side === 'top' ? [0, 0, 0, 6] : [0, 6, 0, 0],
+  });
 }
 
 function convertSerializedHtmlToPdfBlocks(html: string, ctx: PdfCtx): Record<string, any>[] {
@@ -337,7 +349,10 @@ function emitImageTokenBlocks(childEl: any, ctx: { imageMap: Map<string, string>
     const dataUrl = src ? ctx.imageMap.get(src) : undefined;
     if (!dataUrl) continue;
 
-    const maxWidthStr = tok.style?.getPropertyValue('--field-image-max-width') || '';
+    const maxWidthStr =
+      tok.style?.getPropertyValue('--field-image-max-width') ||
+      tok.getAttribute?.('data-max-width') ||
+      '';
     const maxWidth = parseInt(maxWidthStr, 10) || 320;
     imageBlocks.push({ image: dataUrl, width: Math.min(maxWidth, 515), margin: [0, 4, 0, 4] });
 
@@ -595,6 +610,13 @@ function convertVisionTable(tableEl: any, ctx: PdfCtx): Record<string, any> | nu
 
 function convertSectionWrap(sectionWrap: any, ctx: PdfCtx): Record<string, any> | null {
   const stack: Record<string, any>[] = [];
+  const borderTop = sectionWrap.classList?.contains('document-section--border-top') === true;
+  const borderBottom = sectionWrap.classList?.contains('document-section--border-bottom') === true;
+
+  if (borderTop) {
+    stack.push(buildSectionBorderRuleBlock('top'));
+  }
+
   const labelEl = sectionWrap.querySelector('.document-section__header .document-section__label-text');
   const label = String(labelEl?.textContent ?? '').trim();
   if (label) {
@@ -610,6 +632,10 @@ function convertSectionWrap(sectionWrap: any, ctx: PdfCtx): Record<string, any> 
   const bodyEl = sectionWrap.querySelector('.preview-document__section');
   if (bodyEl) {
     stack.push(...convertSectionBodyToPdfBlocks(bodyEl, ctx));
+  }
+
+  if (borderBottom) {
+    stack.push(buildSectionBorderRuleBlock('bottom'));
   }
 
   if (!stack.length) return null;

@@ -1,4 +1,4 @@
-import type { FieldHandler } from '@docengine/editor';
+import type { FieldHandler } from '@docengine/editor/types';
 import { dateFieldHandler } from './date-field-handler.js';
 
 export {

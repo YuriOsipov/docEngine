@@ -315,6 +315,7 @@
   background: transparent;
 }
 
+.field-token--focused:not(.field-token--design),
 .editor-holder--show-fields .field-token--active:not(.field-token--design) {
   outline: 2px solid var(--me-field-active-outline);
   outline-offset: 1px;
@@ -816,8 +817,10 @@ body:has(.page > .design-shell:not(.design-shell--active)) {
   background: rgba(15, 23, 42, 0.28);
 }
 
+/* Dim chrome (header/footer) while a field dialog covers the full Lightning shell. */
 .modal-overlay--palette.modal-overlay--contained {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.28);
+  z-index: 100;
 }
 
 /* Document preview — fill the Lightning modal shell (not the narrow page column) */
