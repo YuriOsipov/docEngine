@@ -10,6 +10,7 @@ export {
   isValidFieldId,
   labelToFieldKey,
   buildTableColumnsFromLabels,
+  normalizeStoredColumnWidth,
   syncTableColumnKeyChanges,
   applyFieldIdChange,
   getDefaultFieldValue,

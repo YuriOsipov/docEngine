@@ -238,6 +238,7 @@ body {
 .preview-document .vision-table td {
   border: 1px solid #999;
   padding: 4px 8px;
+  min-width: 0;
   overflow: hidden;
   vertical-align: top;
 }
@@ -250,7 +251,7 @@ body {
   color: inherit;
   text-transform: none;
   letter-spacing: normal;
-  text-align: inherit;
+  text-align: center;
 }
 .vision-table--borderless th,
 .vision-table--borderless td,

@@ -54,6 +54,7 @@ export const DOCUMENT_TABLE_TEXT_STYLE: FieldDisplayStyle = {
  */
 export const DOCUMENT_TABLE_HEADER_STYLE: FieldDisplayStyle = {
   ...DEFAULT_DOCUMENT_BODY_STYLE,
+  textAlign: 'center',
 };
 
 /** Matches `.preview-document__title` in editor.css */

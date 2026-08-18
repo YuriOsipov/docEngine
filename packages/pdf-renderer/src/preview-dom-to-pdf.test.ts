@@ -315,6 +315,54 @@ describe('previewDomToPdfContent', () => {
     assert.ok(parts.some((part: any) => part.bold === true && String(part.text ?? '').includes('After rule')));
   });
 
+  it('preserves html field <br> line breaks in column addresses', () => {
+    const root = document.createElement('div');
+    root.className = 'preview-document';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-document__section-wrap';
+    const body = document.createElement('div');
+    body.className = 'preview-document__section document-section__body';
+
+    const columns = document.createElement('div');
+    columns.className = 'document-columns';
+    const grid = document.createElement('div');
+    grid.className = 'document-columns__grid';
+
+    const shipping = document.createElement('div');
+    shipping.className = 'document-columns__col';
+    shipping.innerHTML = [
+      '<b>Shipping Address</b>',
+      '<span class="field-token field-token--preview">Jackson Skeeters</span>',
+      '<span class="field-token field-token--preview field-token--html">7575 W 20th Ave,<br>Denver, Colorado 80214<br>United States</span>',
+    ].join('');
+
+    const payment = document.createElement('div');
+    payment.className = 'document-columns__col';
+    payment.innerHTML =
+      '<span class="field-token field-token--preview">Vincenzo Artino</span>';
+
+    grid.appendChild(payment);
+    grid.appendChild(shipping);
+    columns.appendChild(grid);
+    body.appendChild(columns);
+    wrap.appendChild(body);
+    root.appendChild(wrap);
+
+    const content = previewDomToPdfContent(root, {
+      resolveFontName: fontRegistry.resolveFontName,
+      defaultFont: fontRegistry.defaultFont,
+      baseFontSize: 12,
+    });
+
+    const columnNodes = findPdfColumnNodes(content);
+    assert.equal(columnNodes.length, 1);
+    const shippingText = nodeTextJoined(columnNodes[0].columns[1]);
+    assert.match(shippingText, /7575 W 20th Ave,[\s\S]+Denver, Colorado 80214[\s\S]+United States/);
+    assert.doesNotMatch(shippingText, /7575 W 20th Ave,Denver/);
+    assert.match(shippingText, /\n/);
+  });
+
   it('converts inline document-table inside section body to pdfmake table grid', () => {
     const root = document.createElement('div');
     root.className = 'preview-document';

@@ -131,6 +131,7 @@ export {
   resolveTableInstanceRows,
   labelToFieldKey,
   buildTableColumnsFromLabels,
+  normalizeStoredColumnWidth,
   syncTableColumnKeyChanges,
   extractRowKeysFromTableValues,
   mergeTableInstanceRows,

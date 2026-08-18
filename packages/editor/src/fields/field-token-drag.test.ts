@@ -50,4 +50,16 @@ describe('design field token drag handle', () => {
     assert.equal(handleAfter.draggable, true);
     assert.equal(readTokenValue(token), 'World');
   });
+
+  it('falls back to visible text when scalar dataset has replacement chars', () => {
+    const token = createFieldToken('f2', 'Glassix +Plus Refill No 1: Ø1.2-Ø0.6', 'Label');
+    token.dataset.value = 'Glassix +Plus Refill No 1: \uFFFD1.2-\uFFFD0.6';
+    assert.equal(readTokenValue(token), 'Glassix +Plus Refill No 1: Ø1.2-Ø0.6');
+  });
+
+  it('falls back to visible text for common mojibake scalar patterns', () => {
+    const token = createFieldToken('f3', 'Glassix +Plus Refill No 1: Ø1.2-Ø0.6', 'Label');
+    token.dataset.value = 'Glassix +Plus Refill No 1: Ã˜1.2-Ã˜0.6';
+    assert.equal(readTokenValue(token), 'Glassix +Plus Refill No 1: Ø1.2-Ø0.6');
+  });
 });

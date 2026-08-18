@@ -300,6 +300,41 @@ describe('createTreeModal manual edit sync', () => {
     assert.equal(childB?.checked, true);
   });
 
+  it('ArrowUp skips children of collapsed parents', async () => {
+    installDom();
+    const { createTreeModal } = await import('./tree-modal.js');
+
+    createTreeModal().open({
+      title: 'Complaints',
+      tree: [
+        {
+          label: 'Vision disturbance',
+          children: [{ label: 'blurring' }, { label: 'diplopia' }],
+        },
+        {
+          label: 'Pain',
+          children: [{ label: 'aching' }, { label: 'sharp' }],
+        },
+        { label: 'Redness' },
+      ],
+      allowManualEdit: false,
+      selected: [],
+    });
+
+    const overlay = document.querySelector('.modal-overlay');
+    dispatchKey(overlay, 'ArrowDown');
+    dispatchKey(overlay, 'ArrowDown');
+    dispatchKey(overlay, 'ArrowDown');
+
+    let active = document.querySelector('.modal-picker-row--active');
+    assert.match(active?.textContent ?? '', /Redness/);
+
+    dispatchKey(overlay, 'ArrowUp');
+    active = document.querySelector('.modal-picker-row--active');
+    assert.match(active?.textContent ?? '', /Pain/);
+    assert.doesNotMatch(active?.textContent ?? '', /aching|sharp/);
+  });
+
   it('ArrowRight expands highlighted parent row', async () => {
     installDom();
     const { createTreeModal } = await import('./tree-modal.js');

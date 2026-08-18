@@ -133,22 +133,47 @@ function buildFieldTokenStyleAttr(token: any): string {
   return styles.join('; ');
 }
 
+function appendTextWithPdfBreaks(doc: any, target: any, raw: string): void {
+  const text = String(raw ?? '').replace(/\u200B/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!text) return;
+  if (!text.includes('\n')) {
+    target.appendChild(doc.createTextNode(text));
+    return;
+  }
+  const pieces = text.split('\n');
+  pieces.forEach((piece: string, index: number) => {
+    if (piece) target.appendChild(doc.createTextNode(piece));
+    if (index < pieces.length - 1) target.appendChild(doc.createElement('br'));
+  });
+}
+
+/**
+ * Copy field-token children for PDF HTML serialization.
+ * textContent flattens `<br>` / block markup, so HTML addresses become one line.
+ */
+function appendTokenContentsForPdf(source: any, target: any): void {
+  const doc = source.ownerDocument;
+  for (const child of [...source.childNodes]) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      appendTextWithPdfBreaks(doc, target, String(child.textContent ?? ''));
+      continue;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    if (child.tagName === 'BR') {
+      target.appendChild(doc.createElement('br'));
+      continue;
+    }
+    const clone = child.cloneNode(false);
+    appendTokenContentsForPdf(child, clone);
+    target.appendChild(clone);
+  }
+}
+
 function replaceFieldTokenWithStyledSpan(token: any): void {
   const span = token.ownerDocument.createElement('span');
   const styleAttr = buildFieldTokenStyleAttr(token);
   if (styleAttr) span.setAttribute('style', styleAttr);
-
-  const text = String(token.textContent ?? '').replace(/\u200B/g, '');
-  if (text.includes('\n')) {
-    const pieces = text.split('\n');
-    pieces.forEach((piece: string, index: number) => {
-      if (piece) span.appendChild(token.ownerDocument.createTextNode(piece));
-      if (index < pieces.length - 1) span.appendChild(token.ownerDocument.createElement('br'));
-    });
-  } else {
-    span.textContent = text;
-  }
-
+  appendTokenContentsForPdf(token, span);
   token.replaceWith(span);
 }
 

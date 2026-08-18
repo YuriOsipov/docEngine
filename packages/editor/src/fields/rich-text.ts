@@ -208,10 +208,12 @@ export function sanitizeHtml(html: any) {
       }
 
       if (!ALLOWED_TAGS.has(child.tagName)) {
-        while (child.firstChild) {
-          node.insertBefore(child.firstChild, child);
+        clean(child);
+        if (LINE_BREAKING_BLOCK_TAGS.has(child.tagName)) {
+          unwrapPreservingLineBreak(node, child);
+        } else {
+          unwrapElement(child);
         }
-        child.remove();
         continue;
       }
 
@@ -235,18 +237,14 @@ export function sanitizeHtml(html: any) {
       }
 
       if (child.tagName === 'SPAN' && !child.attributes.length) {
-        while (child.firstChild) {
-          node.insertBefore(child.firstChild, child);
-        }
-        child.remove();
+        clean(child);
+        unwrapElement(child);
         continue;
       }
 
       if (child.tagName === 'DIV' && !child.attributes.length) {
-        while (child.firstChild) {
-          node.insertBefore(child.firstChild, child);
-        }
-        child.remove();
+        clean(child);
+        unwrapPreservingLineBreak(node, child);
         continue;
       }
 
@@ -366,6 +364,48 @@ function unwrapElement(el: any) {
     parent.insertBefore(el.firstChild, el);
   }
   parent.removeChild(el);
+}
+
+const LINE_BREAKING_BLOCK_TAGS = new Set([
+  'DIV',
+  'P',
+  'BLOCKQUOTE',
+  'SECTION',
+  'ARTICLE',
+  'HEADER',
+  'FOOTER',
+  'PRE',
+  'ADDRESS',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+]);
+
+function previousMeaningfulSibling(child: any) {
+  let prev = child.previousSibling;
+  while (prev) {
+    if (prev.nodeType === Node.ELEMENT_NODE) return prev;
+    if (prev.nodeType === Node.TEXT_NODE && (prev.textContent ?? '').replace(/\u00a0/g, ' ').trim()) {
+      return prev;
+    }
+    prev = prev.previousSibling;
+  }
+  return null;
+}
+
+/** Unwrap a block so contenteditable line breaks become <br> instead of one inline string. */
+function unwrapPreservingLineBreak(parent: any, child: any) {
+  const prev = previousMeaningfulSibling(child);
+  if (prev && prev.nodeName !== 'BR') {
+    parent.insertBefore(parent.ownerDocument.createElement('br'), child);
+  }
+  while (child.firstChild) {
+    parent.insertBefore(child.firstChild, child);
+  }
+  child.remove();
 }
 
 function findAncestorTag(node: any, tagName: any, editable: any) {

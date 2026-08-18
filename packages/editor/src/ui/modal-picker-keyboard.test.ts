@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
 import {
   findPickerRowIndex,
+  getPickerRows,
   isTreePickerNavigationKey,
   navigatePickerRowIndex,
   shouldIgnorePickerNavigation,
@@ -32,6 +33,26 @@ describe('modal-picker-keyboard', () => {
     assert.equal(shouldIgnorePickerNavigation(document.querySelector('.modal__custom-entries-input')), true);
     assert.equal(shouldIgnorePickerNavigation(document.querySelector('.modal__footer button')), true);
     assert.equal(shouldIgnorePickerNavigation(document.querySelector('.modal__search')), false);
+  });
+
+  it('skips rows inside hidden collapsed branches', () => {
+    const { document } = parseHTML(`
+      <div class="tree-root">
+        <div class="tree-node">
+          <div class="tree-node__row">Pain</div>
+          <div class="tree-node__children" hidden>
+            <div class="tree-node"><div class="tree-node__row">aching</div></div>
+            <div class="tree-node"><div class="tree-node__row">sharp</div></div>
+          </div>
+        </div>
+        <div class="tree-node"><div class="tree-node__row">Redness</div></div>
+      </div>
+    `);
+    globalThis.Element = document.defaultView.Element;
+    globalThis.HTMLElement = document.defaultView.HTMLElement;
+
+    const rows = getPickerRows(document.querySelector('.tree-root')!, '.tree-node__row');
+    assert.deepEqual(rows.map((row) => row.textContent), ['Pain', 'Redness']);
   });
 
   it('finds row index and detects tree navigation keys', () => {

@@ -134,8 +134,11 @@ export function wireModalMove(
     observer.observe(overlay, { attributes: true, attributeFilter: ['hidden'] });
   }
 
-  handle.addEventListener('mousedown', (event: MouseEvent) => {
+  // Pointer events cover mouse, finger, and Apple Pencil. iPad Safari does not
+  // fire mousemove during a touch drag, so mouse-only listeners never move.
+  handle.addEventListener('pointerdown', (event: PointerEvent) => {
     if (event.button !== 0) return;
+    if (event.isPrimary === false) return;
     if (shouldIgnoreMoveHandle(event.target)) return;
 
     event.preventDefault();
@@ -147,14 +150,21 @@ export function wireModalMove(
     const startTop = overlayRect ? modalRect.top - overlayRect.top : modal.offsetTop;
     applyModalPosition(modal, startLeft, startTop);
 
+    const pointerId = event.pointerId;
     const startX = event.clientX;
     const startY = event.clientY;
     let moved = false;
 
     document.body.classList.add('modal-move-active');
     modal.classList.add('modal--dragging');
+    try {
+      handle.setPointerCapture(pointerId);
+    } catch {
+      // linkedom / browsers without capture
+    }
 
-    function onMove(moveEvent: MouseEvent) {
+    function onMove(moveEvent: PointerEvent) {
+      if (moveEvent.pointerId !== pointerId) return;
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
@@ -162,11 +172,18 @@ export function wireModalMove(
       applyModalPosition(modal, next.left, next.top);
     }
 
-    function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+    function onUp(upEvent: PointerEvent) {
+      if (upEvent.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
       document.body.classList.remove('modal-move-active');
       modal.classList.remove('modal--dragging');
+      try {
+        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+      } catch {
+        // ignore
+      }
 
       const left = Number.parseFloat(modal.style.left) || 0;
       const top = Number.parseFloat(modal.style.top) || 0;
@@ -175,8 +192,9 @@ export function wireModalMove(
       if (moved) swallowNextClick();
     }
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   });
 
   return { restore };

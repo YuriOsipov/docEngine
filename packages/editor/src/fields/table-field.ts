@@ -24,7 +24,13 @@ import {
   resolveValueOrFillDefault,
 } from './inline-fields.js';
 import { createInlineRepeaterSeedValue } from './repeater-field.js';
-import { wireTableColumnResize } from './wire-table-column-resize.js';
+import {
+  TABLE_ROW_ACTIONS_COL_WIDTH_PX,
+  TABLE_ROW_LABEL_COL_WIDTH,
+  getTableDataColElements,
+  schemaWidthToColCss,
+  wireTableColumnResize,
+} from './wire-table-column-resize.js';
 
 function tableHasRowLabels(rows: any): boolean {
   return (rows ?? []).some((row: any) => String(row?.label ?? '').trim() !== '');
@@ -85,27 +91,16 @@ function resolveCellValue(cellId: any, fieldValues: any, fieldSchemas: any, bloc
   return filled;
 }
 
-function normalizeColumnWidth(width: any) {
-  const value = String(width ?? '').trim();
-  if (!value || value === 'auto') return '';
-  return value;
-}
-
-function applyColumnWidth(el: any, col: any) {
-  const width = normalizeColumnWidth(col?.width);
+function applyColumnWidth(el: any, col: any, { pin = false }: any = {}) {
+  const width = schemaWidthToColCss(col?.width);
   if (!width) return;
 
   el.style.width = width;
 
-  // With table-layout: fixed and width: 100%, unspecified slack is assigned to
-  // columns that only have width set. Pin explicit sizes so preview matches schema.
-  if (/^\d+(\.\d+)?px$/i.test(width)) {
-    el.style.minWidth = width;
-    el.style.maxWidth = width;
-  } else if (/^\d+(\.\d+)?%$/.test(width)) {
-    el.style.minWidth = width;
-    el.style.maxWidth = width;
-  }
+  // Pin only on `<col>`: min/max on every cell fights table-layout:fixed.
+  if (!pin) return;
+  el.style.minWidth = width;
+  el.style.maxWidth = width;
 }
 
 function buildColgroup(tableSchema: any, includeRowActions: any, includeRowLabels = false) {
@@ -113,20 +108,36 @@ function buildColgroup(tableSchema: any, includeRowActions: any, includeRowLabel
   if (includeRowLabels) {
     const labelCol = document.createElement('col');
     labelCol.className = 'vision-table__row-label-col';
-    labelCol.style.width = '3em';
+    labelCol.style.width = TABLE_ROW_LABEL_COL_WIDTH;
     colgroup.appendChild(labelCol);
   }
   for (const col of tableSchema.columns ?? []) {
     const colEl = document.createElement('col');
-    applyColumnWidth(colEl, col);
+    applyColumnWidth(colEl, col, { pin: true });
     colgroup.appendChild(colEl);
   }
   if (includeRowActions) {
     const actionsCol = document.createElement('col');
-    actionsCol.style.width = '32px';
+    actionsCol.style.width = `${TABLE_ROW_ACTIONS_COL_WIDTH_PX}px`;
     colgroup.appendChild(actionsCol);
   }
   return colgroup;
+}
+
+export function applyTableColumnWidthsToElement(tableOrWrapper: any, columns: any) {
+  const table = tableOrWrapper?.matches?.('table.vision-table')
+    ? tableOrWrapper
+    : tableOrWrapper?.querySelector?.('.vision-table');
+  if (!table) return;
+  const colEls = getTableDataColElements(table);
+  (columns ?? []).forEach((col: any, index: any) => {
+    const colEl = colEls[index];
+    if (!colEl) return;
+    colEl.style.width = '';
+    colEl.style.minWidth = '';
+    colEl.style.maxWidth = '';
+    applyColumnWidth(colEl, col, { pin: true });
+  });
 }
 
 export function syncTableRowsDataset(tableWrapper: any, rows: any) {
@@ -278,7 +289,6 @@ function buildTableRowElement(row: any, tableFieldId: any, tableSchema: any, fie
 
   for (const col of tableSchema.columns ?? []) {
     const td = document.createElement('td');
-    applyColumnWidth(td, col);
     const fieldSchemas =
       options.fieldSchemas ?? options.getRegistry?.()?.getFieldSchemas?.() ?? {};
     const cellId = cellFieldId(tableFieldId, row.key, col.key);
@@ -388,7 +398,6 @@ function buildTableHead(tableFieldId: any, tableSchema: any, includeRowActions: 
     } else {
       th.textContent = col.label;
     }
-    applyColumnWidth(th, col);
     if (!resizeOnly) {
       applyFieldDisplayStyle(
         th,
@@ -401,7 +410,7 @@ function buildTableHead(tableFieldId: any, tableSchema: any, includeRowActions: 
         ),
       );
     }
-    if (withResizers) appendColumnResizer(th, colIndex);
+    if (withResizers && colIndex < columns.length - 1) appendColumnResizer(th, colIndex);
     headerRow.appendChild(th);
   });
   if (includeRowActions) {
@@ -474,6 +483,8 @@ export function buildTableElement(tableFieldId: any, fieldValues: any, options: 
       getRegistry: options.getRegistry ?? (() => registry),
       onSchemaChange: options.onSchemaChange,
       onTableColumnWidthsChange: options.onTableColumnWidthsChange,
+      onTableColumnWidthsPreview: options.onTableColumnWidthsPreview,
+      onTableColumnResizeStart: options.onTableColumnResizeStart,
     });
   }
 
@@ -538,6 +549,7 @@ export function buildPreviewTableElement(tableFieldId: any, fieldValues: any, op
   const { fieldSchemas, previewContext, tableRows: segmentRows } = options;
   const tableSchema = getTableSchema(tableFieldId, options);
   const tableRows = options.tableRows ?? resolveTableInstanceRows(segmentRows, tableSchema);
+  const blocks = options.blocks ?? previewContext?.blocks ?? [];
   const showEmptyRows = options.showEmptyRows ?? previewContext?.hideEmptyValues !== true;
   const includeRowLabels = shouldShowRowLabels(tableSchema, tableRows);
   const table = document.createElement('table');
@@ -559,7 +571,7 @@ export function buildPreviewTableElement(tableFieldId: any, fieldValues: any, op
     const rowCells = [];
     for (const col of tableSchema.columns ?? []) {
       const cellId = cellFieldId(tableFieldId, row.key, col.key);
-      const value = resolveCellValue(cellId, fieldValues, fieldSchemas);
+      const value = resolveCellValue(cellId, fieldValues, fieldSchemas, blocks);
       rowCells.push({ col, cellId, value });
     }
 
@@ -584,7 +596,6 @@ export function buildPreviewTableElement(tableFieldId: any, fieldValues: any, op
 
     for (const { col, cellId, value } of rowCells) {
       const td = document.createElement('td');
-      applyColumnWidth(td, col);
       const showCell =
         tableCellHasContent(cellId, value, fieldSchemas, col) ||
         tableCellIsRequiredEmpty(cellId, value, fieldSchemas, col);

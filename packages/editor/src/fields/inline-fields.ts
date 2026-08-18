@@ -214,7 +214,12 @@ function resolveEditorHolder(container: any, options: any = {}) {
   return options.editorHolder ?? container?.closest?.('[data-doc-editor]') ?? null;
 }
 
-export function collectAllFieldValuesFromHolder(holder: any, localValues: any = {}) {
+function preferLocalFieldIdSet(options: any = {}) {
+  const ids = options.preferLocalFieldIds ?? (options.changedFieldId ? [options.changedFieldId] : []);
+  return new Set((ids ?? []).filter(Boolean));
+}
+
+export function collectAllFieldValuesFromHolder(holder: any, localValues: any = {}, options: any = {}) {
   if (!holder?.querySelectorAll) {
     return recoverImageValuesFromDom(null, { ...(localValues ?? {}) });
   }
@@ -223,11 +228,13 @@ export function collectAllFieldValuesFromHolder(holder: any, localValues: any = 
   for (const editable of holder.querySelectorAll('.document-section__body')) {
     Object.assign(merged, extractFieldValuesFromDom(editable));
   }
-  const out = { ...merged, ...(localValues ?? {}) };
-  // Prefer non-empty live token values over empty stubs in fieldValues (lists, images, etc.).
-  // Stored empties used to win and Document preview would omit fields still visible in the editor.
+  const out = { ...(localValues ?? {}) };
+  const preferLocal = preferLocalFieldIdSet(options);
+  // Prefer non-empty live token values; keep stored when DOM scrape is empty (placeholders).
+  // A just-saved picker value is newer than the token until updateFieldToken runs — keep it.
   for (const [fieldId, domVal] of Object.entries(merged)) {
-    if (isFieldEmpty(out[fieldId]) && !isFieldEmpty(domVal)) {
+    if (preferLocal.has(fieldId) && !isFieldEmpty(out[fieldId])) continue;
+    if (!isFieldEmpty(domVal) || isFieldEmpty(out[fieldId])) {
       out[fieldId] = domVal;
     }
   }
@@ -414,7 +421,7 @@ export function refreshComputedFields(container: any, valuesMap: any, options: a
   const blocks = options.blocks ?? registry?.getBlocks?.() ?? [];
   const changedFieldId = options.changedFieldId;
   const holder = resolveEditorHolder(container, options);
-  const evaluationValues = collectAllFieldValuesFromHolder(holder, valuesMap);
+  const evaluationValues = collectAllFieldValuesFromHolder(holder, valuesMap, options);
 
   const holderSections = holder
     ? [...holder.querySelectorAll('.document-section__body')]
@@ -436,7 +443,7 @@ export function refreshComputedFields(container: any, valuesMap: any, options: a
       const { value, error } = evaluateComputedField(fieldId, evaluationValues, schemas, { blocks });
       if (error) token.title = error;
       else token.removeAttribute('title');
-      updateFieldToken(token, value, token.dataset.placeholder, options);
+      updateFieldToken(token, value, token.dataset.placeholder, fieldTokenUpdateContext(token, options, schemas));
     });
 
     ensureFieldTokenCaretAnchors(target);
@@ -456,7 +463,7 @@ export function syncFillComputedFields(container: any, valuesMap: any = {}, opti
   const blocks = options.blocks ?? registry?.getBlocks?.() ?? [];
   const holder = resolveEditorHolder(container, options);
 
-  const merged = collectAllFieldValuesFromHolder(holder, valuesMap);
+  const merged = collectAllFieldValuesFromHolder(holder, valuesMap, options);
   // Keep non-computed DOM/local values; recompute all computed (preview parity).
   for (const [fieldId, schema] of Object.entries(schemas) as [string, { type?: string }][]) {
     if (schema?.type === 'computed') delete merged[fieldId];
@@ -473,7 +480,12 @@ export function syncFillComputedFields(container: any, valuesMap: any = {}, opti
       const fieldId = token.dataset.fieldId;
       if (!fieldId || schemas[fieldId]?.type !== 'computed') return;
       token.removeAttribute('title');
-      updateFieldToken(token, merged[fieldId] ?? '', token.dataset.placeholder, options);
+      updateFieldToken(
+        token,
+        merged[fieldId] ?? '',
+        token.dataset.placeholder,
+        fieldTokenUpdateContext(token, options, schemas),
+      );
     });
     ensureFieldTokenCaretAnchors(target);
   }
@@ -511,6 +523,15 @@ function normalizeTableCellTokenValue(token: any, value: any, placeholder: any) 
   return value;
 }
 
+function fieldTokenUpdateContext(token: any, options: any = {}, schemas: any = {}) {
+  const isTableCell = token.classList.contains('field-token--cell');
+  return {
+    ...options,
+    fieldSchemas: options.fieldSchemas ?? schemas,
+    isTableCell: options.isTableCell ?? isTableCell,
+  };
+}
+
 export function refreshTableCellTokens(root: any, context: any = {}) {
   const scope = root?.querySelector ? root : document;
   const registry = resolveRegistry(context);
@@ -521,6 +542,14 @@ export function refreshTableCellTokens(root: any, context: any = {}) {
   for (const token of scope.querySelectorAll('.field-token--cell')) {
     const fieldId = token.dataset.fieldId;
     if (!fieldId) continue;
+    // Computed cells are painted by syncFillComputedFields. Re-reading the
+    // formatted display (e.g. "$1,000.00") on EditorJS save restyles them.
+    if (
+      token.classList.contains('field-token--computed')
+      || fieldSchemas[fieldId]?.type === 'computed'
+    ) {
+      continue;
+    }
     // Nested tokens inside a Child preview are not top-level document cells.
     // Re-refreshing them (or rebuilding the parent Child from a half-read
     // preview) wipes values just written by the Child modal.
@@ -558,6 +587,9 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
   const label = getFieldDisplayLabel(fieldId, placeholder ?? token.dataset.placeholder, registryCtx);
   const def = resolveFieldDef(fieldId, registryCtx);
   const schema = registry?.getFieldSchemas()?.[fieldId] ?? context?.fieldSchemas?.[fieldId];
+  if (schema?.type === 'text' && !def?.htmlEditor) {
+    value = sanitizeTextFieldValue(value);
+  }
   token.dataset.placeholder = label;
 
   // Keep the design grip (and its drag listeners) across content rebuilds.
@@ -641,6 +673,7 @@ export function updateFieldToken(token: any, value: any, placeholder: any, conte
     }
   } else if (def?.htmlEditor) {
     token.classList.add('field-token--html');
+    value = normalizeHtmlEditorValue(value);
     const empty = isFieldEmpty(value, { htmlEditor: true });
     if (empty) {
       if (showEmptyPlaceholder) {
@@ -862,6 +895,16 @@ function toDatasetFieldValue(value: any) {
 
 function writeTokenDatasetValue(token: any, value: any) {
   try {
+    // Normalize newline codes right before we persist the value into `data-value`.
+    // This covers cases where value sanitization happens in some render paths
+    // but downstream code (export / source view) relies on dataset storage.
+    if (typeof value === 'string') {
+      if (token.classList?.contains('field-token--html')) {
+        value = normalizeHtmlEditorValue(value);
+      } else {
+        value = sanitizeTextFieldValue(value);
+      }
+    }
     token.dataset.value = toDatasetFieldValue(value);
   } catch (err) {
     try {
@@ -887,6 +930,23 @@ export function readTokenValue(token: any) {
     const text = normalizeScalarTokenValue(readFieldTokenVisibleText(token).replace(/×$/, '').trim());
     if (isTableCellPlaceholderValue(token, text, token.dataset.placeholder)) return '';
     return text;
+  }
+
+  if (
+    typeof raw === 'string' &&
+    hasSuspiciousEncodingArtifacts(raw) &&
+    !raw.startsWith('{') &&
+    !raw.startsWith('[')
+  ) {
+    const visible = normalizeScalarTokenValue(readFieldTokenVisibleText(token).replace(/×$/, '').trim());
+    if (
+      typeof visible === 'string' &&
+      visible &&
+      !hasSuspiciousEncodingArtifacts(visible)
+    ) {
+      if (isTableCellPlaceholderValue(token, visible, token.dataset.placeholder)) return '';
+      return visible;
+    }
   }
 
   if (raw.startsWith('[') || raw.startsWith('{')) {
@@ -926,6 +986,41 @@ export function findLiveFieldToken(fieldId: any, root: any) {
 function normalizeScalarTokenValue(value: any) {
   if (typeof value !== 'string') return value;
   return stripFieldTokenCaretAnchors(value);
+}
+
+function hasSuspiciousEncodingArtifacts(value: any) {
+  if (typeof value !== 'string') return false;
+  return value.includes('\uFFFD') || /Ã.|Â.|ï¿½/.test(value);
+}
+
+function sanitizeTextFieldValue(value: any) {
+  if (typeof value !== 'string') return value;
+  // Handle both real CR/LF and literal escaped sequences like "\\n\\r".
+  return value
+    .replace(/\\r\\n/g, '')
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '')
+    .replace(/[\r\n]+/g, '');
+}
+
+function normalizeHtmlEditorValue(value: any) {
+  if (typeof value !== 'string') return value;
+  // Normalize escaped newline pairs first so \n\r or \r\n becomes a single break.
+  let out = value
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n\\r/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\n/g, '\n');
+
+  // If it looks like authored HTML, don't add additional <br> for *real* CR/LF
+  // that may exist as formatting whitespace.
+  if (/<\/?[a-z][\s\S]*>/i.test(out)) {
+    return out.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+
+  // Plain text: convert real CR/LF to <br>.
+  out = out.replace(/\r\n/g, '\n').replace(/\n\r/g, '\n').replace(/\r/g, '\n');
+  return out.replace(/\n/g, '<br>');
 }
 
 export function textToFragment(text: any) {
@@ -3060,6 +3155,8 @@ export function wireTableRegions(container: any, options: any = {}) {
           getRegistry: options.getRegistry,
           onSchemaChange: options.onSchemaChange,
           onTableColumnWidthsChange: options.onTableColumnWidthsChange,
+          onTableColumnWidthsPreview: options.onTableColumnWidthsPreview,
+          onTableColumnResizeStart: options.onTableColumnResizeStart,
         });
       }
     }
@@ -3167,8 +3264,15 @@ export async function pickFillFieldFromToken(
   token.classList.add('field-token--active');
   try {
     const next = await openFieldPicker(fieldId, current, callbacks);
-    // Persist to fieldValues first: updateFieldToken may fail on huge data-value attrs (LWS).
-    // Resolve the live token AFTER onUpdate — sync/structure hooks may replace the node.
+    // Paint the token before onUpdate so computed-field sync scrapes the new value.
+    // onUpdate may still remount the node (structure/save); refresh the live token after.
+    if (token.isConnected) {
+      try {
+        updateFieldToken(token, next, placeholder, updateContext);
+      } catch (err) {
+        console.warn('[docengine] Failed to refresh field token after pick', err);
+      }
+    }
     onUpdate?.(fieldId, next);
     const live =
       findLiveFieldToken(fieldId, holder) ?? (token.isConnected ? token : null);

@@ -111,18 +111,27 @@ export function wirePanelSplitter(container: any,options: any = {}) {
   applySizes();
 
   splitters.forEach((splitter: any,index: any) => {
-    splitter.addEventListener('mousedown', (event: any) => {
+    splitter.addEventListener('pointerdown', (event: any) => {
+      if (event.button != null && event.button !== 0) return;
+      if (event.isPrimary === false) return;
       event.preventDefault();
       event.stopPropagation();
 
+      const pointerId = event.pointerId;
       const startX = event.clientX;
       const startSizes = [...sizes];
       const totalWidth = container.clientWidth || 1;
 
       splitter.classList.add('field-mapping-splitter--active');
       document.body.classList.add('field-mapping-split-active');
+      try {
+        splitter.setPointerCapture(pointerId);
+      } catch {
+        // linkedom / browsers without capture
+      }
 
       function onMove(moveEvent: any) {
+        if (moveEvent.pointerId !== pointerId) return;
         const deltaPct = ((moveEvent.clientX - startX) / totalWidth) * 100;
 
         if (index === 0) {
@@ -140,16 +149,24 @@ export function wirePanelSplitter(container: any,options: any = {}) {
         applySizes();
       }
 
-      function onUp() {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+      function onUp(upEvent: any) {
+        if (upEvent.pointerId !== pointerId) return;
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
         splitter.classList.remove('field-mapping-splitter--active');
         document.body.classList.remove('field-mapping-split-active');
+        try {
+          if (splitter.hasPointerCapture?.(pointerId)) splitter.releasePointerCapture(pointerId);
+        } catch {
+          // ignore
+        }
         writePanelSplitCookie(cookieKey, sizes);
       }
 
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
     });
   });
 }

@@ -66,7 +66,7 @@ describe('resolveTableColumnDisplayStyle', () => {
     assert.equal(style.fontFamily, headerDefault.fontFamily);
     assert.equal(style.fontSize, headerDefault.fontSize);
     assert.equal(style.fontWeight, 'normal');
-    assert.equal(style.textAlign, undefined);
+    assert.equal(style.textAlign, 'center');
     assert.equal(style.fontStyle, undefined);
   });
 
@@ -91,7 +91,7 @@ describe('resolveTableColumnDisplayStyle', () => {
     assert.equal(style.fontSize, '15px');
     assert.equal(style.fontFamily, 'Tahoma');
     assert.equal(style.fontWeight, 'normal');
-    assert.equal(style.textAlign, undefined);
+    assert.equal(style.textAlign, 'center');
   });
 });
 

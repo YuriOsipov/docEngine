@@ -1,7 +1,16 @@
 export const PICKER_ROW_ACTIVE_CLASS = 'modal-picker-row--active';
 
+function isInsideHiddenAncestor(row: Element, container: Element) {
+  for (let el = row.parentElement; el && el !== container; el = el.parentElement) {
+    if (el.hasAttribute('hidden')) return true;
+  }
+  return false;
+}
+
 export function getPickerRows(container: Element, rowSelector: string) {
-  return [...container.querySelectorAll(rowSelector)];
+  return [...container.querySelectorAll(rowSelector)].filter(
+    (row) => !isInsideHiddenAncestor(row, container),
+  );
 }
 
 export function clearPickerRowActive(container: Element) {

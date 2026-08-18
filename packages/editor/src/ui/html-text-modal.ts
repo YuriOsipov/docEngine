@@ -1,4 +1,8 @@
-import { execRichTextCommand, sanitizeHtml, saveSelection } from '../fields/rich-text.js';
+import {
+  execRichTextCommand,
+  sanitizeHtml,
+  saveSelection,
+} from '../fields/rich-text.js';
 import { FORMAT_ICONS } from './format-icons.js';
 import { wireModalEscape } from './wire-modal-escape.js';
 import { applyFieldFormTextStyle } from '../core/page-setup-styles.js';
@@ -143,7 +147,17 @@ export function createHtmlTextModal({ parent = null }: { parent?: HTMLElement | 
       resolvePromise = resolve;
       rejectPromise = reject;
       header.textContent = title;
-      editor.innerHTML = sanitizeHtml(value ?? '');
+      // Convert literal escaped newlines (from JSON like "\\n\\r") into real line breaks,
+      // then ensure they become actual <br> nodes (deterministic for sanitizeHtml).
+      const normalized = String(value ?? '')
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n\\r/g, '\n')
+        .replace(/\\r/g, '\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\n\r/g, '\n')
+        .replace(/\r/g, '\n');
+      editor.innerHTML = sanitizeHtml(normalized.replace(/\n/g, '<br>'));
       editor.dataset.placeholder = placeholder || 'Enter text...';
       applyFieldFormTextStyle(modalRoot, textStyle);
       applyFieldFormTextStyle(editor, textStyle);

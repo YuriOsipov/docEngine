@@ -130,7 +130,7 @@ import {
   recoverImageValuesFromDom,
 } from './fields/inline-fields.js';
 import { saveSelection } from './fields/rich-text.js';
-import { readTableRowsFromDom, refreshTableHeadersInDom } from './fields/table-field.js';
+import { readTableRowsFromDom, refreshTableHeadersInDom, applyTableColumnWidthsToElement } from './fields/table-field.js';
 import {
   setFieldSelectionChangeCallback,
   clearAllDesignTokenSelection,
@@ -773,6 +773,52 @@ export function createEditor(options: any = {}) {
     return editable;
   }
 
+  function applyLiveTableColumnWidths(tableId: any, columns: any) {
+    if (!tableId || !Array.isArray(columns)) return;
+    const schema = registry.getFieldSchemas()?.[tableId];
+    if (!schema || schema.type !== 'table') return;
+    registry.updateFieldSchema(tableId, { ...schema, columns });
+    applyTableColumnWidthsToElement(findLiveTableEl(tableId), columns);
+    options.onSchemaChange?.(registry.getFieldSchemas());
+  }
+
+  function syncTableWidthsToProperties(tableId: any, columns: any) {
+    if (!propertiesPanel || !tableId) return;
+    propertiesPanel.cancelPersist?.();
+    propertiesPanel.syncTableColumnWidths?.(tableId, columns);
+  }
+
+  function handleTableColumnWidthsChange(tableId: any, columns: any) {
+    options.onSchemaChange?.(registry.getFieldSchemas());
+    syncTableWidthsToProperties(tableId, columns);
+  }
+
+  function handleTableColumnWidthsPreview(tableId: any, columns: any) {
+    syncTableWidthsToProperties(tableId, columns);
+  }
+
+  function handleTableColumnResizeStart(tableId: any) {
+    const columns = propertiesPanel?.commitLiveTableColumnWidths?.(tableId);
+    if (columns) applyLiveTableColumnWidths(tableId, columns);
+    propertiesPanel?.cancelPersist?.();
+  }
+
+  function isTableWidthOnlyChange(prev: any, next: any) {
+    if (!prev || prev.type !== 'table' || next?.type !== 'table') return false;
+    if (!!prev.hideHeader !== !!next.hideHeader) return false;
+    if (!!prev.hideBorders !== !!next.hideBorders) return false;
+    if (String(prev.name ?? prev.label ?? '') !== String(next.name ?? next.label ?? '')) return false;
+    if (String(prev.label ?? '') !== String(next.label ?? '')) return false;
+    const prevCols = prev.columns ?? [];
+    const nextCols = next.columns ?? [];
+    if (prevCols.length !== nextCols.length) return false;
+    return prevCols.every((col: any, index: any) => (
+      col.key === nextCols[index].key &&
+      col.label === nextCols[index].label &&
+      (col.name ?? col.label) === (nextCols[index].name ?? nextCols[index].label)
+    ));
+  }
+
   function getInlineFieldOptions() {
     return {
       getRegistry: () => registry,
@@ -787,11 +833,9 @@ export function createEditor(options: any = {}) {
       },
       onPaletteDrop: handlePaletteDrop,
       onSchemaChange: (schemas: any) => options.onSchemaChange?.(schemas),
-      onTableColumnWidthsChange: (tableId: any) => {
-        options.onSchemaChange?.(registry.getFieldSchemas());
-        // Keep the table field selected in the properties panel after a splitter drag.
-        void loadFieldProperties(tableId);
-      },
+      onTableColumnWidthsChange: handleTableColumnWidthsChange,
+      onTableColumnWidthsPreview: handleTableColumnWidthsPreview,
+      onTableColumnResizeStart: handleTableColumnResizeStart,
       onColumnsWidthsChange: (columnsEl: any) => {
         // Keep the columns block selected in the properties panel after a splitter drag.
         if (columnsEl?.isConnected) {
@@ -1150,12 +1194,13 @@ export function createEditor(options: any = {}) {
     try {
       const blocks = await getBlocksForProperties();
       const schemas = registry.getFieldSchemas();
+      const liveSchema = schemas[fieldId] ?? schema;
       const placement = findFieldPlacement(fieldId, blocks);
       selectedSectionBlockIndex = -1;
       updateSectionSelectionHighlight();
       clearColumnsSelection();
 
-      if (schema.type === 'table') {
+      if (liveSchema.type === 'table') {
         const tableEl = findLiveTableEl(fieldId);
         if (tableEl) {
           clearTableSelection();
@@ -1168,7 +1213,7 @@ export function createEditor(options: any = {}) {
         clearTableSelection();
       }
 
-      propertiesPanel.showField(fieldId, schema, {
+      propertiesPanel.showField(fieldId, liveSchema, {
         sectionName: placement.sectionName,
         sectionLabel: placement.sectionName,
         blocks,
@@ -1293,6 +1338,17 @@ export function createEditor(options: any = {}) {
     }
 
     if (updated.type === 'table') {
+      if (!idChanged && isTableWidthOnlyChange(previousSchema, updated)) {
+        registry.updateFieldSchema(previousFieldId, {
+          ...previousSchema,
+          ...updated,
+          columns: updated.columns,
+        });
+        applyTableColumnWidthsToElement(findLiveTableEl(previousFieldId), updated.columns);
+        options.onSchemaChange?.(registry.getFieldSchemas());
+        return true;
+      }
+
       const saved = await editor.save();
       let nextSchemas = registry.getFieldSchemas();
       let nextBlocks = saved.blocks;
@@ -1633,6 +1689,14 @@ export function createEditor(options: any = {}) {
 
   function selectTableEl(tableEl: any) {
     if (!tableEl?.isConnected) return;
+    const tableId = tableEl.dataset.tableId;
+    const alreadyShowing = selectedTableEl === tableEl
+      && propertiesPanel?.getCurrentFieldId?.() === tableId;
+    if (alreadyShowing) {
+      tableEl.classList.add('document-table--selected');
+      focusStructureTarget(tableEl);
+      return;
+    }
     clearAllDesignTokenSelection(holder);
     selectedSectionBlockIndex = -1;
     updateSectionSelectionHighlight();
@@ -1640,7 +1704,6 @@ export function createEditor(options: any = {}) {
     selectedTableEl = tableEl;
     tableEl.classList.add('document-table--selected');
     focusStructureTarget(tableEl);
-    const tableId = tableEl.dataset.tableId;
     if (tableId) void loadFieldProperties(tableId, null);
   }
 
@@ -2148,11 +2211,9 @@ export function createEditor(options: any = {}) {
       onSectionDataChange: syncSectionDataToRegistry,
       onFieldValueChange: refreshSectionVisibility,
       onSchemaChange: (schemas: any) => options.onSchemaChange?.(schemas),
-      onTableColumnWidthsChange: (tableId: any) => {
-        options.onSchemaChange?.(registry.getFieldSchemas());
-        // Keep the table field selected in the properties panel after a splitter drag.
-        void loadFieldProperties(tableId);
-      },
+      onTableColumnWidthsChange: handleTableColumnWidthsChange,
+      onTableColumnWidthsPreview: handleTableColumnWidthsPreview,
+      onTableColumnResizeStart: handleTableColumnResizeStart,
       onColumnsWidthsChange: (columnsEl: any) => {
         if (columnsEl?.isConnected) {
           selectColumnsEl(columnsEl);
@@ -2367,6 +2428,19 @@ export function createEditor(options: any = {}) {
       attachRepeatableInstances(doc);
       return doc;
     }
+    // Ensure preview/export always sees the latest live token state (including
+    // table-cell values) even before EditorJS serialization runs.
+    refreshTableCellTokens(holder, {
+      getRegistry: () => registry,
+      fieldValueStyle,
+      fillModeFieldHighlight: !designMode && showFieldsInFillMode && !options.mappingMode,
+    });
+    syncFillComputedFields(holder, {}, {
+      getRegistry: () => registry,
+      editorHolder: holder,
+      fieldValueStyle,
+      fillModeFieldHighlight: !designMode && showFieldsInFillMode && !options.mappingMode,
+    });
     const saved = await editor.save();
     registry.setBlocks(saved.blocks ?? []);
     // Re-attach image data URLs from live thumbs (dataset only keeps a compact stub under LWS).
@@ -2500,9 +2574,11 @@ export function createEditor(options: any = {}) {
         const previousSchema = registry.getFieldSchemas()[result.previousFieldId];
         const previousType = previousSchema?.type;
         if (!previousSchema || !previousType) return;
+        const widthOnly = isTableWidthOnlyChange(previousSchema, result.schema);
         const ok = await applySchemaSaveResult(result, previousType, previousSchema);
-        if (ok) await loadFieldProperties(result.fieldId);
+        if (ok && !widthOnly) await loadFieldProperties(result.fieldId);
       },
+      onLiveTableColumnWidths: applyLiveTableColumnWidths,
       onSaveSection: handleSaveSection,
       onSaveColumns: handleSaveColumns,
       onSaveDocument: handleSaveDocument,
@@ -3114,6 +3190,16 @@ export function createEditor(options: any = {}) {
           resume();
         }
       }
+
+      // Keep parity with mapping apply: after import/load remounts EditorJS and
+      // tokens are seeded, recompute all computed values from loaded fields so
+      // table totals/subtotals are immediately correct before manual edits.
+      syncFillComputedFields(holder, {}, {
+        getRegistry: () => registry,
+        editorHolder: holder,
+        fieldValueStyle,
+        fillModeFieldHighlight: !designMode && showFieldsInFillMode && !options.mappingMode,
+      });
 
       // Version switch / import remounts EditorJS; drop stale section selection
       // and show Page Setup so the properties panel matches the new document.

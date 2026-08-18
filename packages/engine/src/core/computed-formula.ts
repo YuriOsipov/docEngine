@@ -3,6 +3,7 @@ import {
   extractFormulaDependencyFieldIds,
   resolveFormulaReference,
 } from './formula-field-index.js';
+import { cellFieldId, parseCellFieldId } from './field-schemas.js';
 import type { EditorBlock, FieldSchema } from '../types.js';
 import {
   getFormulaFunction,
@@ -44,6 +45,8 @@ type FormulaRuntime = {
   fieldSchemas: FieldSchemaMap;
   evaluating: Set<string>;
   blocks: EditorBlock[];
+  selfId?: string;
+  selfCellRef?: { tableFieldId: string; rowKey: string; colKey: string } | null;
   formulaFunctions?: FormulaFunctionDef[];
 };
 
@@ -127,6 +130,10 @@ function resolveScalarFieldValue(fieldId: string, runtime: FormulaRuntime): unkn
   const schema = runtime.fieldSchemas?.[fieldId];
   if (schema?.type === 'computed') {
     runtime.evaluating.add(fieldId);
+    const prevSelfId = runtime.selfId;
+    const prevSelfCellRef = runtime.selfCellRef;
+    runtime.selfId = fieldId;
+    runtime.selfCellRef = parseCellFieldId(fieldId, runtime.fieldSchemas);
     try {
       const { value, error } = evaluateFormulaInternal(
         (schema.formula as string | undefined) ?? '',
@@ -135,6 +142,8 @@ function resolveScalarFieldValue(fieldId: string, runtime: FormulaRuntime): unkn
       if (error) throw new Error(error);
       return scalarizeRawValue(value);
     } finally {
+      runtime.selfId = prevSelfId;
+      runtime.selfCellRef = prevSelfCellRef;
       runtime.evaluating.delete(fieldId);
     }
   }
@@ -154,6 +163,14 @@ function resolveReferenceValues(ref: string, runtime: FormulaRuntime): unknown[]
 
   if (resolved.kind === 'scalar') {
     return [resolveScalarFieldValue(resolved.fieldId, runtime)];
+  }
+
+  const selfCellRef = runtime.selfCellRef;
+  if (selfCellRef && resolved.tableId === selfCellRef.tableFieldId) {
+    const sameRowCellId = cellFieldId(resolved.tableId, selfCellRef.rowKey, resolved.colKey);
+    if (runtime.fieldSchemas?.[sameRowCellId]) {
+      return [resolveScalarFieldValue(sameRowCellId, runtime)];
+    }
   }
 
   return resolved.cellIds.map((cellId) => resolveScalarFieldValue(cellId, runtime));
@@ -404,11 +421,16 @@ export function evaluateFormula(
 ): FormulaResult {
   const evaluating = new Set(options.evaluating ?? []);
   if (options.selfId) evaluating.add(options.selfId);
+  const selfCellRef = options.selfId
+    ? parseCellFieldId(options.selfId, fieldSchemas)
+    : null;
   return evaluateFormulaInternal(formula, {
     values,
     fieldSchemas,
     evaluating,
     blocks: options.blocks ?? [],
+    selfId: options.selfId,
+    selfCellRef,
     formulaFunctions: options.formulaFunctions,
   });
 }

@@ -110,18 +110,27 @@ export function wireModalResize(modalEl: any,options: any) {
   handle.title = 'Resize';
   modalEl.appendChild(handle);
 
-  handle.addEventListener('mousedown', (event: any) => {
+  handle.addEventListener('pointerdown', (event: any) => {
+    if (event.button != null && event.button !== 0) return;
+    if (event.isPrimary === false) return;
     event.preventDefault();
     event.stopPropagation();
 
+    const pointerId = event.pointerId;
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = modalEl.offsetWidth;
     const startHeight = modalEl.offsetHeight;
 
     document.body.classList.add('modal-resize-active');
+    try {
+      handle.setPointerCapture(pointerId);
+    } catch {
+      // linkedom / browsers without capture
+    }
 
     function onMove(moveEvent: any) {
+      if (moveEvent.pointerId !== pointerId) return;
       const nextWidth = clamp(
         startWidth + moveEvent.clientX - startX,
         minWidth,
@@ -136,13 +145,20 @@ export function wireModalResize(modalEl: any,options: any) {
     }
 
     function onUp(upEvent: any) {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      if (upEvent.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
       document.body.classList.remove('modal-resize-active');
+      try {
+        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+      } catch {
+        // ignore
+      }
       writeModalSizeCookie(cookieKey, modalEl.offsetWidth, modalEl.offsetHeight);
 
-      // Drag ends with mouseup on the backdrop; browsers then synthesize a click on
-      // the overlay which would close the modal. Swallow that one click.
+      // Drag ends on the backdrop; browsers then synthesize a click on the overlay
+      // which would close the modal. Swallow that one click.
       function blockBackdropClick(clickEvent: any) {
         clickEvent.preventDefault();
         clickEvent.stopImmediatePropagation();
@@ -153,7 +169,8 @@ export function wireModalResize(modalEl: any,options: any) {
       upEvent?.preventDefault();
     }
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   });
 }

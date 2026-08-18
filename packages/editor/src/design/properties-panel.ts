@@ -22,6 +22,7 @@ export function createPropertiesPanel({
   onSaveDocument,
   onRepeaterTemplateChange,
   onOpenPageSetup,
+  onLiveTableColumnWidths,
   getRemoteListCollections = null,
   getRemoteListLabelFields = null,
 }: any = {}) {
@@ -230,6 +231,7 @@ export function createPropertiesPanel({
   let suppressPersist = false;
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
   let persistInFlight: Promise<unknown> | null = null;
+  let persistEpoch = 0;
 
   const fieldController = createSchemaEditorController({
     getRegistry,
@@ -477,11 +479,13 @@ export function createPropertiesPanel({
   }
 
   async function persistCurrent() {
+    const epoch = persistEpoch;
     if (mode === 'field') {
       const result = fieldController.trySave();
       if (!result) return false;
+      if (epoch !== persistEpoch) return false;
       await onSaveField?.(result);
-      return true;
+      return epoch === persistEpoch;
     }
 
     if (mode === 'section' && sectionBlockIndex >= 0) {
@@ -574,8 +578,10 @@ export function createPropertiesPanel({
       persistTimer = null;
     }
 
+    const epoch = persistEpoch;
     const run = () => {
       persistTimer = null;
+      if (epoch !== persistEpoch) return;
       const task = Promise.resolve()
         .then(() => persistCurrent())
         .catch(() => {})
@@ -628,6 +634,15 @@ export function createPropertiesPanel({
   wireAutoPersist(columnsWrap);
   wireAutoPersist(fieldFormHost, { textOnBlur: true });
 
+  fieldFormHost.addEventListener('input', (event: any) => {
+    if (suppressPersist) return;
+    if (mode !== 'field') return;
+    if (!event.target?.matches?.('[data-field="columnWidths"]')) return;
+    const fieldId = fieldController.getCurrentFieldId();
+    const columns = fieldController.applyColumnWidthsInput?.(event.target.value);
+    if (fieldId && columns) onLiveTableColumnWidths?.(fieldId, columns);
+  });
+
   header.querySelector('[data-action="open-page-setup"]')?.addEventListener('click', () => {
     if (onOpenPageSetup) {
       onOpenPageSetup();
@@ -646,6 +661,24 @@ export function createPropertiesPanel({
     getMode: () => mode,
     getCurrentFieldId: () => fieldController.getCurrentFieldId(),
     isFieldLoaded: () => fieldController.isLoaded(),
+    cancelPersist() {
+      persistEpoch += 1;
+      if (persistTimer) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+      }
+    },
+    syncTableColumnWidths(fieldId: any, columns: any) {
+      if (mode !== 'field') return false;
+      if (fieldController.getCurrentFieldId() !== fieldId) return false;
+      withSuppressedPersist(() => fieldController.syncTableColumnWidths?.(columns));
+      return true;
+    },
+    commitLiveTableColumnWidths(fieldId: any) {
+      if (mode !== 'field') return null;
+      if (fieldController.getCurrentFieldId() !== fieldId) return null;
+      return fieldController.applyColumnWidthsInputFromDom?.() ?? null;
+    },
     /** Persist the open properties form (used before leaving design mode). */
     async flush() {
       if (persistTimer) {

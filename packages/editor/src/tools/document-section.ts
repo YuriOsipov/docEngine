@@ -291,12 +291,11 @@ export default class DocumentSection {
     this.wireTableRegions();
 
     if (!this.config.designMode) {
-      this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-        getRegistry: this.config.getRegistry,
-        editorHolder: this.config.editorHolder,
-        fieldValueStyle: this.config.fieldValueStyle,
-        fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-      });
+      this.data.fieldValues = syncFillComputedFields(
+        this.editable,
+        this.data.fieldValues,
+        this.getComputedSyncOptions(),
+      );
     }
 
     if (this.config.designMode) {
@@ -333,10 +332,32 @@ export default class DocumentSection {
     this.config.onSectionDataChange?.(this.getPersistedData(), this.wrapper);
   }
 
+  getComputedSyncOptions() {
+    return {
+      getRegistry: this.config.getRegistry,
+      editorHolder: this.config.editorHolder,
+      fieldValueStyle: this.config.fieldValueStyle,
+      fillModeFieldHighlight: this.config.fillModeFieldHighlight,
+    };
+  }
+
   updateSegmentsFromDom() {
     if (!this.editable) return;
     this.data.segments = serializeEditableToSegments(this.editable);
     this.notifySectionDataChange();
+  }
+
+  syncComputedAfterValueChange(fieldId: any, value: any) {
+    this.data.fieldValues[fieldId] = value;
+    this.data.fieldValues = syncFillComputedFields(
+      this.editable,
+      this.data.fieldValues,
+      {
+        ...this.getComputedSyncOptions(),
+        changedFieldId: fieldId,
+      },
+    );
+    this.data.fieldValues[fieldId] = value;
   }
 
   getFieldOptions() {
@@ -345,13 +366,7 @@ export default class DocumentSection {
       fieldValues: this.data.fieldValues,
       onDeleteField: (fieldId: any,token: any) => this.deleteInlineField(fieldId, token),
       onCellValueChange: (fieldId: any,value: any) => {
-        this.data.fieldValues[fieldId] = value;
-        this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-          getRegistry: this.config.getRegistry,
-          editorHolder: this.config.editorHolder,
-          fieldValueStyle: this.config.fieldValueStyle,
-          fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-        });
+        this.syncComputedAfterValueChange(fieldId, value);
         this.config.onFieldValueChange?.(fieldId, value);
       },
       onTableRowRemoved: (tableId: any,rowKey: any) => {
@@ -367,12 +382,11 @@ export default class DocumentSection {
         this.updateSegmentsFromDom();
         if (!this.config.designMode && this.editable) {
           const previous = this.data.fieldValues ?? {};
-          this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-            getRegistry: this.config.getRegistry,
-            editorHolder: this.config.editorHolder,
-            fieldValueStyle: this.config.fieldValueStyle,
-            fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-          });
+          this.data.fieldValues = syncFillComputedFields(
+            this.editable,
+            this.data.fieldValues,
+            this.getComputedSyncOptions(),
+          );
           const registry = this.config.getRegistry?.();
           const schemas = registry?.getFieldSchemas?.() ?? {};
           // Keep stored Child values when DOM scrape is incomplete (preview omits cells).
@@ -510,14 +524,7 @@ export default class DocumentSection {
         this.editable,
         this.config,
         (fieldId: any,value: any) => {
-          this.data.fieldValues[fieldId] = value;
-          this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-            getRegistry: this.config.getRegistry,
-            editorHolder: this.config.editorHolder,
-            fieldValueStyle: this.config.fieldValueStyle,
-            fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-          });
-          this.data.fieldValues[fieldId] = value;
+          this.syncComputedAfterValueChange(fieldId, value);
           this.config.onFieldValueChange?.(fieldId, value);
         },
         this.getFieldOptions(),
@@ -525,12 +532,11 @@ export default class DocumentSection {
     }
 
     if (!this.config.designMode) {
-      this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-        getRegistry: this.config.getRegistry,
-        editorHolder: this.config.editorHolder,
-        fieldValueStyle: this.config.fieldValueStyle,
-        fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-      });
+      this.data.fieldValues = syncFillComputedFields(
+        this.editable,
+        this.data.fieldValues,
+        this.getComputedSyncOptions(),
+      );
     }
 
     if (this.config.designMode) {
@@ -572,14 +578,7 @@ export default class DocumentSection {
               }
               return;
             }
-            this.data.fieldValues[id] = value;
-            this.data.fieldValues = syncFillComputedFields(this.editable, this.data.fieldValues, {
-              getRegistry: this.config.getRegistry,
-              editorHolder: this.config.editorHolder,
-              fieldValueStyle: this.config.fieldValueStyle,
-              fillModeFieldHighlight: this.config.fillModeFieldHighlight,
-            });
-            this.data.fieldValues[id] = value;
+            this.syncComputedAfterValueChange(id, value);
             this.config.onFieldValueChange?.(id, value);
           },
           {
@@ -617,10 +616,11 @@ export default class DocumentSection {
     // Always sync live token values into fieldValues. Design mode used to skip this,
     // so Document preview (which reads fieldValues) missed lists/choices visible in the editor.
     // Template export still strips values via buildTemplateExport / stripValuesFromBlocks.
-    this.data.fieldValues = syncFillComputedFields(editable, this.data.fieldValues, {
-      getRegistry: this.config.getRegistry,
-      editorHolder: this.config.editorHolder,
-    });
+    this.data.fieldValues = syncFillComputedFields(
+      editable,
+      this.data.fieldValues,
+      this.getComputedSyncOptions(),
+    );
     this.data.fieldValues = recoverImageValuesFromDom(editable, this.data.fieldValues);
     if (!this.config.designMode) {
       refreshTableCellTokens(editable, this.config);

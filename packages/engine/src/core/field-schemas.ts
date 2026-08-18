@@ -61,6 +61,14 @@ export function labelToFieldKey(label: unknown, usedKeys: Set<string> = new Set(
   return key;
 }
 
+/** Store unitless numbers as percentages (`40` → `40%`). `auto` is omitted. */
+export function normalizeStoredColumnWidth(width: any) {
+  const value = String(width ?? '').trim();
+  if (!value || value === 'auto') return '';
+  if (/^\d+(\.\d+)?$/.test(value)) return `${value}%`;
+  return value;
+}
+
 export function buildTableColumnsFromLabels( labels: any, widths: any = [], previousColumns: any = [], columnNames: any = [],) {
   const usedKeys = new Set<string>();
   const columns: Array<{ key: string; label: string; name: string; width?: string }> = [];
@@ -86,8 +94,8 @@ export function buildTableColumnsFromLabels( labels: any, widths: any = [], prev
     usedKeys.add(key);
 
     const col: { key: string; label: string; name: string; width?: string } = { key, label, name };
-    const width = String(widths[i] ?? '').trim();
-    if (width && width !== 'auto') col.width = width;
+    const width = normalizeStoredColumnWidth(widths[i]);
+    if (width) col.width = width;
     columns.push(col);
   }
 

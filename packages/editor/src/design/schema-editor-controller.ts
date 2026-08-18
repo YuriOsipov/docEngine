@@ -1,6 +1,6 @@
 import { getFieldTypes } from './field-palette.js';
 import { getFieldHandler } from '../fields/handlers/registry.js';
-import { convertSchemaType, buildTableColumnsFromLabels, isCellFieldId } from '../core/field-schemas.js';
+import { convertSchemaType, buildTableColumnsFromLabels, isCellFieldId, normalizeStoredColumnWidth } from '../core/field-schemas.js';
 import {
   parseRepeaterTemplateImport,
   applyRepeaterTemplateImport,
@@ -598,9 +598,9 @@ export function createSchemaEditorController({
         </label>
         <label class="schema-form__row">
           <span>Column widths (optional, comma-separated)</span>
-          <input type="text" data-field="columnWidths" value="${escapeAttr((schema.columns ?? []).map((c) => c.width ?? '').join(', '))}" placeholder="120px, 30%, auto" />
+          <input type="text" data-field="columnWidths" value="${escapeAttr((schema.columns ?? []).map((c) => c.width ?? '').join(', '))}" placeholder="40%, 15%, 15%, 15%, 15%" />
         </label>
-        <p class="schema-form__hint">Widths align with columns by position (e.g. <code>80px, 25%, auto</code>). Leave blank or use <code>auto</code> for flexible columns.</p>
+        <p class="schema-form__hint">Widths align with columns by position (e.g. <code>40%, 20%, auto</code>). Percentages are of the full table (the row-actions column typically takes a few percent). Bare numbers count as <code>%</code>. Leave blank or use <code>auto</code> for flexible columns.</p>
         <p class="schema-form__hint">Column field IDs are generated automatically from column field names. Align by position with Columns.</p>
         <label class="schema-form__row schema-form__row--checkbox">
           <input type="checkbox" data-field="hideHeader" ${schema.hideHeader ? 'checked' : ''} />
@@ -954,8 +954,40 @@ export function createSchemaEditorController({
     return { fieldId: newFieldId, previousFieldId: currentFieldId, schema };
   }
 
+  function applyColumnWidthsInput(widthStr: any) {
+    if (currentSchema?.type !== 'table') return null;
+    const widths = String(widthStr ?? '').split(',').map((s: any) => s.trim());
+    const columns = (currentSchema.columns ?? []).map((col: any, index: any) => {
+      const next = { ...col };
+      const width = normalizeStoredColumnWidth(widths[index]);
+      if (width) next.width = width;
+      else delete next.width;
+      return next;
+    });
+    currentSchema = { ...currentSchema, columns };
+    return columns;
+  }
+
+  function applyColumnWidthsInputFromDom() {
+    const input = body.querySelector('[data-field="columnWidths"]');
+    if (!input) return null;
+    return applyColumnWidthsInput(input.value);
+  }
+
   function getCurrentFieldId() {
     return currentFieldId;
+  }
+
+  function syncTableColumnWidths(columns: any) {
+    if (currentSchema?.type !== 'table') return false;
+    const input = body.querySelector('[data-field="columnWidths"]');
+    if (input) {
+      input.value = (columns ?? []).map((col: any) => col.width ?? '').join(', ');
+    }
+    if (Array.isArray(columns)) {
+      currentSchema = { ...currentSchema, columns };
+    }
+    return true;
   }
 
   function isLoaded() {
@@ -1021,7 +1053,7 @@ export function createSchemaEditorController({
   }
   void _validateFieldIdInput;
 
-  return { load, trySave, clear, getCurrentFieldId, isLoaded };
+  return { load, trySave, clear, getCurrentFieldId, isLoaded, syncTableColumnWidths, applyColumnWidthsInput, applyColumnWidthsInputFromDom };
 }
 
 function escapeAttr(str: any) {

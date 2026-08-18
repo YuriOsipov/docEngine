@@ -313,7 +313,7 @@ describe('renderDocumentToPdfDefinition', () => {
     assert.ok(table);
     const headerRow = table.table.body[0];
     for (const headerCell of headerRow) {
-      assert.equal(headerCell.alignment, undefined);
+      assert.equal(headerCell.alignment, 'center');
       assert.equal(headerCell.bold, false);
       assert.notEqual(headerCell.italics, true);
     }

@@ -92,6 +92,17 @@ describe('buildTableColumnsFromLabels', () => {
       /Duplicate column field ID: visual_acuity/,
     );
   });
+
+  it('stores unitless column widths as percentages', () => {
+    const columns = buildTableColumnsFromLabels(
+      ['Product', 'Total'],
+      ['42', '17%'],
+      [],
+      ['Product', 'Total'],
+    );
+    assert.equal(columns[0].width, '42%');
+    assert.equal(columns[1].width, '17%');
+  });
 });
 
 describe('isCellFieldId', () => {

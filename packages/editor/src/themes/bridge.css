@@ -281,7 +281,7 @@
 }
 
 .editor-holder--show-fields .document-section__body .field-token:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image):not(.field-token--required-missing),
-.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--readonly):not(.field-token--required-missing) {
+.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--required-missing) {
   text-decoration: none;
   cursor: pointer;
 }

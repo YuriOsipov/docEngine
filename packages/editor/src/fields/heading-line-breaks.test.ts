@@ -7,6 +7,7 @@ let renderSegmentsToDom: any;
 let createFieldToken: any;
 let textToFragment: any;
 let plainTextNewlinesToBr: any;
+let sanitizeHtml: any;
 let execRichTextCommand: any;
 let applyBlockHeading: any;
 let applyBlockAlignment: any;
@@ -76,6 +77,7 @@ before(async () => {
   createFieldToken = inline.createFieldToken;
   textToFragment = inline.textToFragment;
   plainTextNewlinesToBr = rich.plainTextNewlinesToBr;
+  sanitizeHtml = rich.sanitizeHtml;
   execRichTextCommand = rich.execRichTextCommand;
   applyBlockHeading = rich.applyBlockHeading;
   applyBlockAlignment = rich.applyBlockAlignment;
@@ -826,5 +828,43 @@ describe('applyBlockHeading and applyBlockAlignment', () => {
     assert.ok(alignDiv.querySelector('.field-token[data-field-id="f1"]'));
     assert.equal(alignDiv.querySelector('.document-table'), null);
     assert.ok(body.querySelector(':scope > .document-table'));
+  });
+});
+
+describe('sanitizeHtml line breaks', () => {
+  it('turns contenteditable div lines into br instead of an inline string', () => {
+    const html = [
+      '<div>7575 W 20th Ave, Denver,</div>',
+      '<div>1111111</div>',
+      '<div>Colorado 80214</div>',
+      '<div>United States</div>',
+    ].join('');
+    assert.equal(
+      sanitizeHtml(html),
+      '7575 W 20th Ave, Denver,<br>1111111<br>Colorado 80214<br>United States',
+    );
+  });
+
+  it('turns paragraph lines into br', () => {
+    assert.equal(
+      sanitizeHtml('<p>line one</p><p>line two</p>'),
+      'line one<br>line two',
+    );
+  });
+
+  it('keeps an empty contenteditable line as a blank break', () => {
+    assert.equal(
+      sanitizeHtml('<div>line one</div><div><br></div><div>line two</div>'),
+      'line one<br><br>line two',
+    );
+  });
+
+  it('does not flatten aligned divs', () => {
+    const html = '<div style="text-align: center">Centered</div>';
+    assert.match(sanitizeHtml(html), /<div style="text-align: center">Centered<\/div>/i);
+  });
+
+  it('does not insert an extra br when a br already separates lines', () => {
+    assert.equal(sanitizeHtml('line one<br><div>line two</div>'), 'line one<br>line two');
   });
 });
