@@ -1,6 +1,6 @@
 {
   "name": "pdf-service",
-  "version": "1.0.0",
+  "version": "0.0.105",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,6 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@docengine/pdf-renderer": "1.0.0"
+    "@docengine/pdf-renderer": "0.0.105"
   }
 }

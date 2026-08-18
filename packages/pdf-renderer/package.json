@@ -1,6 +1,6 @@
 {
   "name": "@docengine/pdf-renderer",
-  "version": "1.0.0",
+  "version": "0.0.105",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -20,7 +20,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@docengine/editor": "1.0.0",
+    "@docengine/editor": "0.0.105",
     "dejavu-fonts-ttf": "^2.37.3",
     "linkedom": "^0.18.12",
     "pdfmake": "^0.2.20"

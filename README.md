@@ -221,4 +221,4 @@ The [`n8n-nodes-docengine`](./apps/n8n-nodes-docengine) package generates HTML/P
 
 ## License
 
-Private / unlicensed unless otherwise noted in individual packages (e.g. `n8n-nodes-docengine` is MIT).
+[MIT](./LICENSE)

@@ -1,6 +1,6 @@
 # @docengine/editor — Interface Specifications
 
-Version: **1.0.0** · IO format version: **`IO_VERSION = 1`**
+Version: **0.0.105** · IO format version: **`IO_VERSION = 1`**
 
 This document defines every public contract of the library: factory options, instance API, data shapes, catalogs, pickers, and extension points.
 

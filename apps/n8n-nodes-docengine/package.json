@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-docengine",
-  "version": "0.1.0",
+  "version": "0.0.105",
   "description": "Generate HTML/PDF documents from editor templates in n8n workflows",
   "type": "module",
   "main": "dist/index.js",
@@ -31,8 +31,8 @@
     "test": "npm run build && node --test dist/nodes/DocEngine/docengine-utils.test.js"
   },
   "dependencies": {
-    "@docengine/engine": "1.0.0",
-    "@docengine/pdf-renderer": "1.0.0"
+    "@docengine/engine": "0.0.105",
+    "@docengine/pdf-renderer": "0.0.105"
   },
   "peerDependencies": {
     "n8n-workflow": ">=1.0.0"

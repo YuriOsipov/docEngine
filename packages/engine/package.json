@@ -1,6 +1,6 @@
 {
   "name": "@docengine/engine",
-  "version": "1.0.0",
+  "version": "0.0.105",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
