@@ -164,7 +164,7 @@ describe('preview-first PDF parity', () => {
     assert.equal(fieldPart.font, 'Roboto');
   });
 
-  it('keeps mammology on preview-first export routing', () => {
+  it('does not treat mammology as a multi-instance page plan', () => {
     const doc = {
       kind: 'document',
       version: 2,
@@ -185,7 +185,7 @@ describe('preview-first PDF parity', () => {
     assert.equal(shouldUseLegacyPdfExport(doc), false);
   });
 
-  it('uses preview-first routing and produces a page header for repeatable section', () => {
+  it('does not treat a single repeatable section as a multi-instance page plan', () => {
     const doc = {
       kind: 'document',
       version: 2,

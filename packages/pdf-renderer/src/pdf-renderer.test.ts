@@ -750,7 +750,7 @@ function findTextInPdfContent(nodes: any, text: any): boolean {
 }
 
 describe('shouldUseLegacyPdfExport', () => {
-  it('returns false for single-instance repeatable section (preview-first handles header natively)', () => {
+  it('returns false for single-instance repeatable section (JSON renderer uses a page header)', () => {
     const tableId = 'items_table';
     const template = {
       kind: 'template',

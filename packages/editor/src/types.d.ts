@@ -372,7 +372,7 @@ export interface DocumentSectionData {
   collapsed?: boolean;
   /** When true, PDF repeats this section once per instance in document data. */
   repeatable?: boolean;
-  /** When true, the section title is omitted from document preview (and preview-first PDF). */
+  /** When true, the section title is omitted from document preview and PDF. */
   hideTitleInPreview?: boolean;
   /** When true, draw a horizontal rule above the section (editor + preview/PDF). */
   borderTop?: boolean;

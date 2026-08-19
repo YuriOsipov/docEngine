@@ -33,8 +33,8 @@ export function hasMultipageRepeatableContent(doc: EditorDocument): boolean {
 }
 
 /**
- * Route PDF export through the legacy segment renderer only for multipage instance layouts.
- * Single-instance repeatable section page headers are handled natively by the preview-first renderer.
+ * True when the document repeats a section once per stored instance (page breaks).
+ * JSON pdfmake handles both this layout and single-instance repeating page headers.
  */
 export function shouldUseLegacyPdfExport(doc: EditorDocument): boolean {
   return hasMultipageRepeatableContent(doc);

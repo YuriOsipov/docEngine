@@ -99,7 +99,7 @@ export interface DocumentSectionData {
   segments?: Segment[];
   fieldValues?: Record<string, unknown>;
   repeatable?: boolean;
-  /** When true, the section title is omitted from document preview (and preview-first PDF). */
+  /** When true, the section title is omitted from document preview and PDF. */
   hideTitleInPreview?: boolean;
   visibility?: SectionVisibilityRule | null;
   [key: string]: unknown;

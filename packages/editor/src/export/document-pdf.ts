@@ -1,34 +1,21 @@
-import {
-  generateDocumentPdfBlob as legacyGenerateDocumentPdfBlob,
-  generateDocumentPdfBlobFromPreview,
-  shouldUseLegacyPdfExport,
-} from '@docengine/pdf-renderer/browser';
+import { generateDocumentPdfBlob as renderJsonDocumentPdfBlob } from '@docengine/pdf-renderer/browser';
 import { saveBlobToDisk } from '../utils/save-blob.js';
 import { resolvePreviewExportOptions } from './preview-export-options.js';
-import { mountPreviewDocumentForPdf } from './preview-pdf-mount.js';
 
 /** False in the Salesforce Static Resource build (pdfmake stubbed). */
 export const isClientPdfAvailable = true;
 
 /**
+ * Portal / browser PDF: same JSON → pdfmake path as `/api/v1/render/pdf`.
+ * Repeating page headers and long-table header repetition come from that renderer.
  * @param {import('../types.d.ts').EditorDocument} doc
  * @param {import('../types.d.ts').PdfExportOptions} [options]
  * @returns {Promise<Blob>}
  */
-export async function generateDocumentPdfBlob(doc: any,options: any = {}) {
+export async function generateDocumentPdfBlob(doc: any, options: any = {}) {
   try {
     const exportOptions = resolvePreviewExportOptions(doc, options);
-
-    if (shouldUseLegacyPdfExport(doc)) {
-      return await legacyGenerateDocumentPdfBlob(doc, exportOptions);
-    }
-
-    const { preview, cleanup } = mountPreviewDocumentForPdf(doc, exportOptions);
-    try {
-      return await generateDocumentPdfBlobFromPreview(doc, preview, exportOptions);
-    } finally {
-      cleanup();
-    }
+    return await renderJsonDocumentPdfBlob(doc, exportOptions);
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(message ? `PDF export failed: ${message}` : 'PDF export failed.');
@@ -39,7 +26,7 @@ export async function generateDocumentPdfBlob(doc: any,options: any = {}) {
  * @param {import('../types.d.ts').EditorDocument} doc
  * @param {import('../types.d.ts').PdfExportOptions} [options]
  */
-export async function exportDocumentPdf(doc: any,options: any = {}) {
+export async function exportDocumentPdf(doc: any, options: any = {}) {
   const { download = true, filename = 'document.pdf' } = options;
   const blob = await generateDocumentPdfBlob(doc, options);
 
