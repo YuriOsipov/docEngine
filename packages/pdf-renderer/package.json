@@ -21,6 +21,7 @@
   ],
   "dependencies": {
     "@docengine/editor": "0.0.105",
+    "@docengine/engine": "0.0.105",
     "dejavu-fonts-ttf": "^2.37.3",
     "linkedom": "^0.18.12",
     "pdfmake": "^0.2.20"

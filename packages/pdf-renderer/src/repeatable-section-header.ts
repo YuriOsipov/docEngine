@@ -11,6 +11,7 @@ import {
   createPdfRenderContext,
   renderSegmentsToPdfProseBlocks,
   buildPdfSectionTitleNode,
+  resolveVisibleSectionLabel,
 } from './segment-renderer.js';
 import { ptToMm } from './units.js';
 
@@ -66,7 +67,7 @@ export function buildRepeatableSectionPageHeader(
   const ctx = createPdfRenderContext(doc, options);
   const data = (repeatable as any).block.data ?? {};
   if (!evaluateSectionVisibility(data.visibility, ctx.fieldValues, ctx.fieldSchemas)) return null;
-  const sectionLabel = String(data.label ?? '').trim();
+  const sectionLabel = resolveVisibleSectionLabel(data);
   const segmentSource = structuredClone(data.segments ?? []);
   const filtered = options.hideEmptyValues === true
     ? filterSegmentsForPreview(

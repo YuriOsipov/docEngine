@@ -59,6 +59,8 @@ export async function generateDocumentHtml(
   options: HtmlRenderOptions = {},
 ): Promise<string> {
   await ensureDomEnvironment();
+  const { ensurePreviewFieldPlugins } = await import('./preview-field-plugins.js');
+  ensurePreviewFieldPlugins();
 
   // Import after DOM shim is in place so document.createElement is available.
   const { renderDocumentPreview } = await import('@docengine/editor/node');

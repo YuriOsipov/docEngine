@@ -116,6 +116,11 @@ export function createPdfRenderContext(doc: EditorDocument, options: PdfRenderOp
   };
 }
 
+export function resolveVisibleSectionLabel(data: any): string {
+  if (!data || data.hideTitleInPreview) return '';
+  return String(data.label ?? '').trim();
+}
+
 export function buildPdfSectionTitleNode(
   sectionLabel: any,
   sectionHeaderStyle: any,
@@ -954,7 +959,7 @@ export function renderSinglePagePdfContent(doc: EditorDocument, options: PdfRend
       if (consumedMeta?.skipEntire) continue;
       if (!evaluateSectionVisibility(data.visibility, ctx.fieldValues, ctx.fieldSchemas)) continue;
 
-      const sectionLabel = String(data.label ?? '').trim();
+      const sectionLabel = resolveVisibleSectionLabel(data);
       const repeatable = !!data.repeatable;
       const filtered = ctx.hideEmptyValues
         ? filterSegmentsForPreview(
@@ -1020,7 +1025,7 @@ export function renderSinglePagePdfContent(doc: EditorDocument, options: PdfRend
 
           let companionTitleNode = null;
           if (adjacent.blockKind === 'section') {
-            const companionLabel = String(adjacent.block.data?.label ?? '').trim();
+            const companionLabel = resolveVisibleSectionLabel(adjacent.block.data);
             if (companionLabel && companionLabel !== sectionLabel) {
               companionTitleNode = buildRepeatableSectionTitleNode(companionLabel, ctx.sectionHeaderPdfStyle);
             }

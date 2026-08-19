@@ -6,6 +6,7 @@ import {
   generatePdfFromTemplate,
   mergeTemplateAndDocument,
   renderDocumentToPdfDefinition,
+  renderPreviewDocumentToPdfDefinition,
 } from './index.js';
 import { buildPdfTable, createPdfRenderContext, renderSegmentsToPdfContent, renderSegmentsToPdfProseBlocks, buildRepeatableSectionTitleNode, buildPdfSectionTitleNode } from './segment-renderer.js';
 import { htmlToPdfBlocks, isBlockLevelHtml, plainTextNewlinesToBrHtml, plainTextToPdfText, stampExplicitPdfBold, finalizePdfInlineParts } from './html-text.js';
@@ -1756,6 +1757,43 @@ describe('renderDocumentToPdfContent multipage', () => {
     assert.ok(chunkContainsText({ stack: def.content }, 'Section body only.'));
   });
 
+  it('omits section header nodes when hideTitleInPreview is true', () => {
+    const doc = {
+      kind: 'document',
+      version: 2,
+      time: Date.now(),
+      fieldSchemas: {},
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Order Details',
+            hideTitleInPreview: true,
+            segments: [{ type: 'text', content: 'GoldenDent' }],
+            fieldValues: {},
+          },
+        },
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Addresses',
+            hideTitleInPreview: false,
+            segments: [{ type: 'text', content: 'Payment Address' }],
+            fieldValues: {},
+          },
+        },
+      ],
+    };
+
+    const { docDefinition } = renderDocumentToPdfDefinition(doc, defaultRenderOptions);
+    const titleHeaders = collectNodesWithStyle((docDefinition as any).content, 'sectionHeader');
+    assert.deepEqual(
+      titleHeaders.map((node: any) => node.text),
+      ['Addresses'],
+    );
+    assert.ok(chunkContainsText({ stack: (docDefinition as any).content }, 'GoldenDent'));
+  });
+
   it('keeps newline characters inline within header prose blocks', () => {
     const doc = {
       kind: 'document',
@@ -2138,6 +2176,58 @@ describe('generateDocumentPdf', () => {
     const doc = mergeTemplateAndDocument(template, makeDocument());
     const buffer = await generateDocumentPdf(doc);
     assert.ok(buffer.length > 500);
+    assert.equal(buffer.subarray(0, 4).toString('ascii'), '%PDF');
+  });
+
+  it('preview-first PDF omits hidden section titles and formats dates', async () => {
+    const doc = {
+      kind: 'document',
+      version: 2,
+      time: Date.now(),
+      fieldSchemas: {
+        added: { type: 'date', name: 'Date Added', label: 'Date Added', dateFormat: 'dd/mm/yyyy' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Order Details',
+            hideTitleInPreview: true,
+            segments: [
+              { type: 'text', content: 'Date Added: ' },
+              { type: 'field', id: 'added' },
+            ],
+            fieldValues: { added: '2026-07-10T16:26:33.000Z' },
+          },
+        },
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Addresses',
+            hideTitleInPreview: false,
+            segments: [{ type: 'text', content: 'Payment Address' }],
+            fieldValues: {},
+          },
+        },
+      ],
+    };
+
+    const { docDefinition } = await renderPreviewDocumentToPdfDefinition(doc);
+    const text = ((docDefinition as any).content ?? [])
+      .map((node: any) => nodeTextJoined(node))
+      .join('\n');
+    const titleHeaders = collectNodesWithStyle((docDefinition as any).content, 'sectionHeader');
+
+    assert.doesNotMatch(text, /Order Details/);
+    assert.match(text, /Addresses/);
+    assert.match(text, /10\/07\/2026/);
+    assert.doesNotMatch(text, /2026-07-10T16:26:33/);
+    assert.deepEqual(
+      titleHeaders.map((node: any) => node.text),
+      ['Addresses'],
+    );
+
+    const buffer = await generateDocumentPdf(doc);
     assert.equal(buffer.subarray(0, 4).toString('ascii'), '%PDF');
   });
 });

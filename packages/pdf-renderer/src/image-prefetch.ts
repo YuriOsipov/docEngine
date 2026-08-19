@@ -8,8 +8,14 @@ async function fetchImageAsDataUrl(url: string): Promise<string> {
 
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const blob = await response.blob();
 
+  if (typeof FileReader === 'undefined') {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const mime = response.headers.get('content-type') || 'image/png';
+    return `data:${mime};base64,${bytes.toString('base64')}`;
+  }
+
+  const blob = await response.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
