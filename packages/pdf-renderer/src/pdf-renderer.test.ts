@@ -6,7 +6,6 @@ import {
   generatePdfFromTemplate,
   mergeTemplateAndDocument,
   renderDocumentToPdfDefinition,
-  renderPreviewDocumentToPdfDefinition,
 } from './index.js';
 import { buildPdfTable, createPdfRenderContext, renderSegmentsToPdfContent, renderSegmentsToPdfProseBlocks, buildRepeatableSectionTitleNode, buildPdfSectionTitleNode } from './segment-renderer.js';
 import { htmlToPdfBlocks, isBlockLevelHtml, plainTextNewlinesToBrHtml, plainTextToPdfText, stampExplicitPdfBold, finalizePdfInlineParts } from './html-text.js';
@@ -2179,14 +2178,12 @@ describe('generateDocumentPdf', () => {
     assert.equal(buffer.subarray(0, 4).toString('ascii'), '%PDF');
   });
 
-  it('preview-first PDF omits hidden section titles and formats dates', async () => {
+  it('omits hidden section titles from the JSON API renderer', () => {
     const doc = {
       kind: 'document',
       version: 2,
       time: Date.now(),
-      fieldSchemas: {
-        added: { type: 'date', name: 'Date Added', label: 'Date Added', dateFormat: 'dd/mm/yyyy' },
-      },
+      fieldSchemas: {},
       blocks: [
         {
           type: 'documentSection',
@@ -2195,9 +2192,9 @@ describe('generateDocumentPdf', () => {
             hideTitleInPreview: true,
             segments: [
               { type: 'text', content: 'Date Added: ' },
-              { type: 'field', id: 'added' },
+              { type: 'text', content: '2026-07-10' },
             ],
-            fieldValues: { added: '2026-07-10T16:26:33.000Z' },
+            fieldValues: {},
           },
         },
         {
@@ -2212,7 +2209,7 @@ describe('generateDocumentPdf', () => {
       ],
     };
 
-    const { docDefinition } = await renderPreviewDocumentToPdfDefinition(doc);
+    const { docDefinition } = renderDocumentToPdfDefinition(doc, defaultRenderOptions);
     const text = ((docDefinition as any).content ?? [])
       .map((node: any) => nodeTextJoined(node))
       .join('\n');
@@ -2220,14 +2217,10 @@ describe('generateDocumentPdf', () => {
 
     assert.doesNotMatch(text, /Order Details/);
     assert.match(text, /Addresses/);
-    assert.match(text, /10\/07\/2026/);
-    assert.doesNotMatch(text, /2026-07-10T16:26:33/);
+    assert.match(text, /Payment Address/);
     assert.deepEqual(
       titleHeaders.map((node: any) => node.text),
       ['Addresses'],
     );
-
-    const buffer = await generateDocumentPdf(doc);
-    assert.equal(buffer.subarray(0, 4).toString('ascii'), '%PDF');
   });
 });

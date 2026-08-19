@@ -2,12 +2,7 @@ import PdfPrinter from 'pdfmake';
 import type { TDocumentDefinitions } from 'pdfmake/interfaces.js';
 import type { EditorDocument, PdfFontFamilyFiles, PdfGenerateInput, PdfRenderOptions } from './types.js';
 import { renderDocumentToPdfDefinition } from './document-pdf-definition-node.js';
-import { renderDocumentToPdfDefinitionFromPreview } from './document-pdf-definition-preview-node.js';
 import { mergeTemplateAndDocument } from './merge-document.js';
-import { ensureDomEnvironment } from './html-environment.js';
-import { shouldUseLegacyPdfExport } from './multipage-renderer.js';
-import { prefetchImagesFromDom } from './image-prefetch.js';
-import { ensurePreviewFieldPlugins } from './preview-field-plugins.js';
 
 export function generatePdfBuffer(
   docDefinition: TDocumentDefinitions,
@@ -25,37 +20,11 @@ export function generatePdfBuffer(
   });
 }
 
-/**
- * Same HTML preview as View as HTML, converted to pdfmake.
- * Multipage repeatable instance layouts still use the document renderer.
- */
-export async function renderPreviewDocumentToPdfDefinition(
-  doc: EditorDocument,
-  options: PdfRenderOptions = {},
-) {
-  await ensureDomEnvironment();
-  ensurePreviewFieldPlugins();
-  const { renderDocumentPreview } = await import('@docengine/editor/node');
-  const previewRoot = renderDocumentPreview(doc as any, {
-    pageSetup: options.pageSetup ?? (doc as any).pageSetup,
-    fieldValueStyle: options.fieldValueStyle,
-    fieldHighlight: options.fieldHighlight,
-    hideEmptyValues: options.hideEmptyValues === true,
-  });
-  const imageMap = await prefetchImagesFromDom(previewRoot as HTMLElement);
-  return renderDocumentToPdfDefinitionFromPreview(previewRoot as HTMLElement, doc, {
-    ...options,
-    imageMap,
-  });
-}
-
 export async function generateDocumentPdf(
   doc: EditorDocument,
   options: PdfRenderOptions = {},
 ): Promise<Buffer> {
-  const { docDefinition, fonts } = shouldUseLegacyPdfExport(doc)
-    ? renderDocumentToPdfDefinition(doc, options)
-    : await renderPreviewDocumentToPdfDefinition(doc, options);
+  const { docDefinition, fonts } = renderDocumentToPdfDefinition(doc, options);
   return generatePdfBuffer(docDefinition as TDocumentDefinitions, fonts);
 }
 
