@@ -2,13 +2,13 @@
 
 Optional companion to **DocEngine**. Owns the callout to **your** HTTPS PDF host. Core DocEngine stays editor + data only.
 
-**Recommended host:** n8n workflow with `n8n-nodes-docengine` (Webhook → DocEngine → Respond PDF binary).
+**Host:** DocEngine.pro `POST /api/v1/render/pdf` (API token on the Named Credential).
 
-Also compatible: `apps/pdf-service` (`POST /pdf/generate`).
+Compatible: `apps/pdf-service` (`POST /api/v1/render/pdf`). n8n remains an optional self-hosted path if the webhook uses the same path and body.
 
-docengine-web API links (`/api/v1/render/*`) are for web/client JSON payloads — not the Salesforce Named Credential path.
+Salesforce posts `{ template, document }` (values-only save) or `{ doc }` (full document with `blocks` + `pageSetup`).
 
-See [PDF.md](./PDF.md) § Bring your own PDF server.
+See [PDF.md](./PDF.md).
 
 ## Packages
 
@@ -29,7 +29,7 @@ sf org assign permset --name DocEngine_Admin --target-org DocEngineDev
 sf org assign permset --name DocEngine_PDF_User --target-org DocEngineDev
 ```
 
-Then set **Named Credential → DocEngine_Pdf** endpoint to a real HTTPS pdf-service URL (not `pdf.example.com`).
+Then set **Named Credential → DocEngine_Pdf** URL to `https://docengine.pro` (no trailing slash) and password = API token `de_…`.
 
 ```bash
 npm run dev:pdf   # local service — expose via ngrok/Cloud Run for the sandbox
@@ -48,12 +48,12 @@ Setup → Custom Settings → **DocEngine Settings** → Manage → New (Organiz
 | Value | Effect |
 |---|---|
 | Unchecked (default) | In-org `Blob.toPdf` from editor HTML — no host |
-| Checked | Named Credential `DocEngine_Pdf` → hosted pdf-service |
+| Checked | Named Credential `DocEngine_Pdf` → DocEngine.pro `POST /api/v1/render/pdf` |
 
 ## Behaviour with PDF package + live URL
 
 - Preview can use `generatePdfBase64` (when LWC passes `generatePdfBlob`)
-- **Save + PDF** callouts → `callout:DocEngine_Pdf/pdf/generate` → Files on instance + source record
+- **Save + PDF** callouts → `callout:DocEngine_Pdf/api/v1/render/pdf` → Files on instance + source record
 
 ## 2GP (later)
 

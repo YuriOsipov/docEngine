@@ -42,7 +42,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/pdf/generate') {
+    const pathOnly = (req.url ?? '').split('?')[0];
+    if (
+      req.method === 'POST' &&
+      (pathOnly === '/pdf/generate' || pathOnly === '/api/v1/render/pdf')
+    ) {
       const body = await readJsonBody(req);
       if (!body) {
         sendJson(res, 400, { error: 'Request body is required.' });
@@ -51,14 +55,13 @@ const server = createServer(async (req, res) => {
 
       let pdfBuffer: Buffer;
 
-      // Self-contained doc export (blocks + fieldSchemas + values).
-      // Accept body.doc (preferred) or body.document with blocks.
+      // Full document snapshot (blocks + pageSetup) — Salesforce preview / filled export.
       const selfContainedDoc =
         (Array.isArray(body.doc?.blocks) && body.doc) ||
         (Array.isArray(body.document?.blocks) && body.document) ||
         null;
 
-      if (selfContainedDoc && !body.template) {
+      if (selfContainedDoc) {
         pdfBuffer = await generateDocumentPdf(selfContainedDoc, {
           pageSetup: body.pageSetup ?? selfContainedDoc.pageSetup,
           fonts: body.fonts,

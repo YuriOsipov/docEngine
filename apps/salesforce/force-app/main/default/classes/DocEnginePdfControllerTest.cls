@@ -75,7 +75,8 @@ private class DocEnginePdfControllerTest {
     upsertOrgSetting(true);
     System.assertEquals('External', DocEnginePdfController.getPdfProvider());
 
-    Boolean calloutPresent = Type.forName('DocEnginePdfCallout') != null;
+    Boolean calloutPresent = Type.forName('DocEnginePdfCallout') != null
+      || Type.forName('docengine', 'DocEnginePdfCallout') != null;
     System.assertEquals(calloutPresent, DocEnginePdfController.isAvailable());
 
     if (calloutPresent) {
@@ -98,7 +99,8 @@ private class DocEnginePdfControllerTest {
 
     upsertOrgSetting(true);
     System.assertEquals(
-      Type.forName('DocEnginePdfCallout') != null,
+      Type.forName('DocEnginePdfCallout') != null
+        || Type.forName('docengine', 'DocEnginePdfCallout') != null,
       DocEnginePdfController.isAvailable()
     );
   }

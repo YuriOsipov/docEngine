@@ -33,10 +33,6 @@ const dist = path.join(root, 'packages/editor/dist');
 const staticDir = path.join(root, 'apps/salesforce/force-app/main/default/staticresources');
 const viewerSrcDir = path.join(root, 'packages/editor/src/sf-pdf-viewer');
 const viewerDistDir = path.join(dist, 'pdf-viewer');
-const pdfWorkerSrc = path.join(
-  root,
-  'node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
-);
 
 function run(cmd, args) {
   const result = spawnSync(cmd, args, {
@@ -70,11 +66,6 @@ console.log('→ Building DocEnginePdfViewer Static Resource…');
 rmSync(viewerDistDir, { recursive: true, force: true });
 mkdirSync(viewerDistDir, { recursive: true });
 copyFileSync(path.join(viewerSrcDir, 'viewer.html'), path.join(viewerDistDir, 'viewer.html'));
-if (!existsSync(pdfWorkerSrc)) {
-  console.error(`Missing pdf.js worker at ${pdfWorkerSrc}`);
-  process.exit(1);
-}
-copyFileSync(pdfWorkerSrc, path.join(viewerDistDir, 'pdf.worker.min.js'));
 run('npx', [
   'esbuild',
   path.join(viewerSrcDir, 'main.ts'),

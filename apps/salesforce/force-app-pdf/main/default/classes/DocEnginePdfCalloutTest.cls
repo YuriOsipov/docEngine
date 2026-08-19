@@ -2,8 +2,10 @@
 private class DocEnginePdfCalloutTest {
   private class PdfMock implements HttpCalloutMock {
     public HTTPResponse respond(HTTPRequest req) {
-      System.assert(req.getEndpoint().contains('/pdf/generate'));
+      System.assert(req.getEndpoint().contains('/api/v1/render/pdf'));
       System.assertEquals('POST', req.getMethod());
+      String body = req.getBody();
+      System.assert(body.contains('"doc"') || body.contains('"template"') || body.contains('"document"'));
       HttpResponse res = new HttpResponse();
       res.setStatusCode(200);
       res.setHeader('Content-Type', 'application/pdf');
@@ -95,6 +97,39 @@ private class DocEnginePdfCalloutTest {
     } catch (AuraHandledException e) {
       threw = true;
       System.assert(e.getMessage().contains('boom') || e.getMessage().contains('500'));
+    }
+    System.assert(threw);
+  }
+
+  @IsTest
+  static void callableGeneratePdfBase64UsesTemplateWhenValuesOnly() {
+    Test.setMock(HttpCalloutMock.class, new PdfMock());
+    DocEnginePdfCallout callout = new DocEnginePdfCallout();
+    Test.startTest();
+    Object b64 = callout.call(
+      'generatePdfBase64',
+      new Map<String, Object>{
+        'documentJson' => '{"kind":"field","version":2,"sections":{}}',
+        'templateJson' => '{"kind":"template","blocks":[],"fieldSchemas":{},"pageSetup":{"format":"a4"}}'
+      }
+    );
+    Test.stopTest();
+    System.assert(b64 instanceof String);
+    System.assert(String.isNotBlank((String) b64));
+  }
+
+  @IsTest
+  static void valuesOnlyWithoutTemplateThrows() {
+    Boolean threw = false;
+    try {
+      new DocEnginePdfCallout().call(
+        'generatePdfBase64',
+        new Map<String, Object>{
+          'documentJson' => '{"kind":"field","version":2,"sections":{}}'
+        }
+      );
+    } catch (AuraHandledException e) {
+      threw = true;
     }
     System.assert(threw);
   }

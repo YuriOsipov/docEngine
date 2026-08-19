@@ -46,7 +46,7 @@ export function createPreviewModal({
    * Prefer an explicit host check (e.g. Salesforce DocEngine_PDF availability).
    */
   pdfAvailable = undefined,
-  /** When false (e.g. Salesforce LWS), render PDF pages to canvas instead of blob: iframe. */
+  /** When false (e.g. Salesforce LWS), embed via Static Resource viewer (native PDF, pdf.js fallback). */
   embedPdfInIframe = true,
   parent = null,
   /** Fired when preview opens/closes (more reliable than reading overlay.hidden under LWS). */
@@ -356,7 +356,7 @@ export function createPreviewModal({
     revokeBlobUrl();
     try {
       const blob = await ensurePdfBlob();
-      // LWS blocks blob: iframe.src; ContentDistribution URLs force download — use canvas.
+      // LWS blocks blob: iframe.src — Static Resource viewer shows the original PDF bytes.
       if (!embedPdfInIframe) {
         await showPdfCanvas(blob);
         return;

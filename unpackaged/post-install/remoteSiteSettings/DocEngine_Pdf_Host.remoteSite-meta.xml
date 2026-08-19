@@ -2,6 +2,6 @@
 <RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
-    <url>https://pdf.example.com</url>
-    <description>Update URL to match DocEngine_Pdf Named Credential / pdf-service host.</description>
+    <url>https://docengine.pro</url>
+    <description>DocEngine.pro host for Named Credential DocEngine_Pdf (POST /api/v1/render/pdf).</description>
 </RemoteSiteSetting>

@@ -2,15 +2,16 @@
  * Optional DocEngine_PDF package — Callable implementation discovered by DocEnginePdfController.
  *
  * Actions:
- *   generatePdfBase64     — args.documentJson (String) → String base64
- *   generatePdfPreviewUrl — args.documentJson (String) → String https/relative URL for iframe (LWS-safe)
+ *   generatePdfBase64     — args.documentJson, optional args.templateJson → String base64
+ *   generatePdfPreviewUrl — args.documentJson, optional args.templateJson → HTTPS/relative URL
  *   generateAndSavePdf    — args.docInstanceId (Id) → Map contentVersionId, contentDocumentId, docInstanceId
  *
- * Requires Named Credential DocEngine_Pdf → HTTPS pdf-service base URL.
+ * Requires Named Credential DocEngine_Pdf → DocEngine.pro (or compatible host) base URL.
+ * POST callout:DocEngine_Pdf/api/v1/render/pdf
  */
 public with sharing class DocEnginePdfCallout implements System.Callable {
   private static final String NAMED_CREDENTIAL = 'DocEngine_Pdf';
-  private static final String GENERATE_PATH = '/pdf/generate';
+  private static final String GENERATE_PATH = '/api/v1/render/pdf';
   private static final Integer TIMEOUT_MS = 120000;
 
   public Object call(String action, Map<String, Object> args) {
@@ -22,7 +23,7 @@ public with sharing class DocEnginePdfCallout implements System.Callable {
       if (String.isBlank(documentJson)) {
         throw new AuraHandledException('documentJson is required.');
       }
-      Blob pdfBlob = callPdfServiceWithBody(documentJson, null);
+      Blob pdfBlob = callPdfServiceWithBody(documentJson, (String) args.get('templateJson'));
       return EncodingUtil.base64Encode(pdfBlob);
     }
     if (action == 'generatePdfPreviewUrl') {
@@ -30,7 +31,9 @@ public with sharing class DocEnginePdfCallout implements System.Callable {
       if (String.isBlank(documentJson)) {
         throw new AuraHandledException('documentJson is required.');
       }
-      return storePreviewAndGetUrl(callPdfServiceWithBody(documentJson, null));
+      return storePreviewAndGetUrl(
+        callPdfServiceWithBody(documentJson, (String) args.get('templateJson'))
+      );
     }
     if (action == 'generateAndSavePdf') {
       Id docInstanceId = (Id) args.get('docInstanceId');
@@ -76,7 +79,6 @@ public with sharing class DocEnginePdfCallout implements System.Callable {
     if (String.isNotBlank(dist.DistributionPublicUrl)) {
       return dist.DistributionPublicUrl;
     }
-    // Fallback: authenticated relative download (may download instead of inline in some browsers)
     return '/sfc/servlet.shepherd/version/download/' + cv.Id;
   }
 
@@ -134,30 +136,47 @@ public with sharing class DocEnginePdfCallout implements System.Callable {
   }
 
   @TestVisible
-  private static Blob callPdfServiceWithBody(String documentJson, String templateJson) {
+  private static Map<String, Object> buildRenderBody(String documentJson, String templateJson) {
     Map<String, Object> body = new Map<String, Object>();
     Object documentObj = JSON.deserializeUntyped(documentJson);
-    body.put('document', documentObj);
+    Map<String, Object> documentMap = documentObj instanceof Map<String, Object>
+      ? (Map<String, Object>) documentObj
+      : null;
+    Boolean hasBlocks = documentMap != null && documentMap.get('blocks') instanceof List<Object>;
+
+    if (hasBlocks) {
+      body.put('doc', documentObj);
+      body.put('document', documentObj);
+      Object pageSetup = documentMap.get('pageSetup');
+      if (pageSetup != null) {
+        body.put('pageSetup', pageSetup);
+      }
+    } else {
+      body.put('document', documentObj);
+    }
 
     if (String.isNotBlank(templateJson)) {
       try {
         Object templateObj = JSON.deserializeUntyped(templateJson);
         if (templateObj instanceof Map<String, Object>) {
-          Map<String, Object> templateMap = (Map<String, Object>) templateObj;
-          Map<String, Object> documentMap = documentObj instanceof Map<String, Object>
-            ? (Map<String, Object>) documentObj
-            : null;
-          String docKind = documentMap == null ? null : (String) documentMap.get('kind');
-          Boolean hasBlocks =
-            documentMap != null && documentMap.get('blocks') instanceof List<Object>;
-          if (docKind == 'field' || (docKind == 'document' && !hasBlocks)) {
-            body.put('template', templateMap);
-          }
+          body.put('template', templateObj);
         }
       } catch (Exception e) {
-        // document-only
+        // document-only full page render
       }
     }
+
+    if (!body.containsKey('doc') && !body.containsKey('template')) {
+      throw new AuraHandledException(
+        'PDF render requires a full document (blocks + pageSetup) or a template plus field values.'
+      );
+    }
+    return body;
+  }
+
+  @TestVisible
+  private static Blob callPdfServiceWithBody(String documentJson, String templateJson) {
+    Map<String, Object> body = buildRenderBody(documentJson, templateJson);
 
     HttpRequest req = new HttpRequest();
     req.setEndpoint('callout:' + NAMED_CREDENTIAL + GENERATE_PATH);

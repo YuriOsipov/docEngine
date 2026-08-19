@@ -16,11 +16,13 @@ Link or copy into your n8n `custom` / community nodes folder per [n8n docs](http
 
 ## Salesforce / custom app → PDF
 
-**This node is the recommended way** for Salesforce and other apps to generate DocEngine PDFs on the user’s own infrastructure.
+Salesforce **DocEngine_PDF** calls DocEngine.pro `POST /api/v1/render/pdf` (see [PDF.md](../../integrations/salesforce/PDF.md)).
+
+Use this node when you want PDFs on **your** n8n host instead. The webhook path must match Apex (`/api/v1/render/pdf`) or you change `GENERATE_PATH` in `DocEnginePdfCallout`.
 
 ```text
 Salesforce or custom app
-  → Webhook (POST)
+  → Webhook (POST /api/v1/render/pdf)
   → DocEngine
        Template Source: From incoming
        Template JSON Path: template
@@ -29,9 +31,7 @@ Salesforce or custom app
   → Respond to Webhook (binary PDF)
 ```
 
-Salesforce `DocEnginePdfCallout` posts `{ "template", "document" }` to Named Credential `DocEngine_Pdf`. Point that credential at this webhook HTTPS URL.
-
-docengine-web **API link** tokens (`/api/v1/render/*`) are a separate web/client flow — not what Salesforce should call.
+Salesforce posts `{ "template", "document" }` or a full `{ "doc" }` with `blocks` + `pageSetup`.
 
 ### Payload + field mapping
 

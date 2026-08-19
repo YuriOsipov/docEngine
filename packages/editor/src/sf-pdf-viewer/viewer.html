@@ -8,6 +8,7 @@
       html,
       body {
         margin: 0;
+        height: 100%;
         background: #525659;
         font-family: system-ui, sans-serif;
       }
@@ -16,26 +17,24 @@
         text-align: center;
         padding: 2rem 1rem;
       }
-      #pages {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem;
-        box-sizing: border-box;
+      #status[hidden] {
+        display: none;
       }
-      #pages canvas {
-        display: block;
-        max-width: 100%;
-        height: auto;
-        background: #fff;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      #embed {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      #embed[hidden] {
+        display: none;
       }
     </style>
   </head>
   <body>
     <div id="status">Waiting for PDF…</div>
-    <div id="pages"></div>
+    <embed id="embed" type="application/pdf" hidden />
     <script src="viewer.js"></script>
   </body>
 </html>

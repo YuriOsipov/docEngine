@@ -2,9 +2,9 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Use_External_PDF__c</fullName>
     <defaultValue>false</defaultValue>
-    <description>When checked, PDF uses Named Credential DocEngine_Pdf → your HTTPS host (recommended: n8n + DocEngine node; or pdf-service). When unchecked, Salesforce Blob.toPdf (HTML→PDF).</description>
+    <description>When checked, PDF uses Named Credential DocEngine_Pdf → DocEngine.pro POST /api/v1/render/pdf. When unchecked, Salesforce Blob.toPdf (HTML→PDF).</description>
     <externalId>false</externalId>
-    <inlineHelpText>Off = Salesforce HTML→PDF (no host). On = Named Credential DocEngine_Pdf → n8n DocEngine webhook (or pdf-service).</inlineHelpText>
+    <inlineHelpText>Off = Salesforce HTML→PDF (no host). On = Named Credential DocEngine_Pdf → DocEngine.pro /api/v1/render/pdf (API token as password).</inlineHelpText>
     <label>Use External PDF</label>
     <trackTrending>false</trackTrending>
     <type>Checkbox</type>

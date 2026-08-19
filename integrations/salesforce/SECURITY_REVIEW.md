@@ -59,7 +59,7 @@ sf scanner run --target apps/salesforce/force-app --format table
 ## Review materials to prepare
 
 1. Solution overview (design vs fill, object model) — [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. External system diagram (org → Named Credential → pdf-service)
+2. External system diagram (org → Named Credential → DocEngine.pro `/api/v1/render/pdf`)
 3. Test org credentials for reviewers
 4. Instructions: assign perm sets, configure Named Credential, place LWCs on pages
 

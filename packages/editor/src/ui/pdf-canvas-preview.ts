@@ -1,6 +1,6 @@
 /**
  * Render PDF in Salesforce via Static Resource viewer iframe (LWS-safe).
- * Parent posts base64 to the viewer; pdf.js runs outside the LWC lock.
+ * Parent posts original PDF base64; the viewer uses the browser native PDF plugin.
  */
 
 function blobToBase64(blob: Blob): Promise<string> {

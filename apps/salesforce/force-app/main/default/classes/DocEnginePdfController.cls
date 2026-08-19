@@ -3,12 +3,13 @@
  *
  * Provider is selected via Hierarchy Custom Setting DocEngine_Settings__c.Use_External_PDF__c:
  *   unchecked — Blob.toPdf(html) in-org (Salesforce)
- *   checked   — DocEnginePdfCallout → Named Credential DocEngine_Pdf → pdf-service
+ *   checked   — DocEnginePdfCallout → Named Credential DocEngine_Pdf → POST /api/v1/render/pdf
  *
  * Default when unset: Salesforce (checkbox false).
  */
 public with sharing class DocEnginePdfController {
   private static final String CALLOUT_CLASS = 'DocEnginePdfCallout';
+  private static final String CALLOUT_NAMESPACE = 'docengine';
   @TestVisible
   private static final String PROVIDER_SALESFORCE = 'Salesforce';
   @TestVisible
@@ -38,22 +39,34 @@ public with sharing class DocEnginePdfController {
     if (resolveProvider() == PROVIDER_SALESFORCE) {
       return true;
     }
-    return Type.forName(CALLOUT_CLASS) != null;
+    return resolveCalloutType() != null;
   }
 
   /**
    * Preview / download PDF.
    * Salesforce: pass html (documentJson ignored). External: pass documentJson.
    */
-  @AuraEnabled
   public static String generatePdfBase64(String documentJson, String html) {
+    return generatePdfBase64(documentJson, html, null);
+  }
+
+  /**
+   * Preview / download PDF. External: pass documentJson and optional templateJson
+   * when documentJson is values-only (`kind: field`).
+   */
+  @AuraEnabled
+  public static String generatePdfBase64(String documentJson, String html, String templateJson) {
     if (resolveProvider() == PROVIDER_SALESFORCE) {
       Blob pdf = htmlToPdf(html);
       return EncodingUtil.base64Encode(pdf);
     }
-    Object result = invoke('generatePdfBase64', new Map<String, Object>{
-      'documentJson' => documentJson
-    });
+    Object result = invoke(
+      'generatePdfBase64',
+      new Map<String, Object>{
+        'documentJson' => documentJson,
+        'templateJson' => templateJson
+      }
+    );
     return result == null ? null : String.valueOf(result);
   }
 
@@ -66,9 +79,13 @@ public with sharing class DocEnginePdfController {
     if (resolveProvider() == PROVIDER_SALESFORCE) {
       return storePreviewAndGetUrl(htmlToPdf(html));
     }
-    Object result = invoke('generatePdfPreviewUrl', new Map<String, Object>{
-      'documentJson' => documentJson
-    });
+    Object result = invoke(
+      'generatePdfPreviewUrl',
+      new Map<String, Object>{
+        'documentJson' => documentJson,
+        'templateJson' => null
+      }
+    );
     return result == null ? null : String.valueOf(result);
   }
 
@@ -205,13 +222,26 @@ public with sharing class DocEnginePdfController {
   }
 
   @TestVisible
-  private static Object invoke(String action, Map<String, Object> args) {
+  private static Type resolveCalloutType() {
     Type t = Type.forName(CALLOUT_CLASS);
+    if (t != null) {
+      return t;
+    }
+    t = Type.forName(CALLOUT_NAMESPACE, CALLOUT_CLASS);
+    if (t != null) {
+      return t;
+    }
+    return Type.forName(CALLOUT_NAMESPACE + '.' + CALLOUT_CLASS);
+  }
+
+  @TestVisible
+  private static Object invoke(String action, Map<String, Object> args) {
+    Type t = resolveCalloutType();
     if (t == null) {
       throw new AuraHandledException(
         'External PDF is selected but DocEngine_PDF is not installed. ' +
-          'Install DocEngine_PDF and configure Named Credential DocEngine_Pdf, ' +
-          'or uncheck DocEngine Settings → Use External PDF.'
+          'Install DocEngine_PDF and configure Named Credential DocEngine_Pdf ' +
+          '(DocEngine.pro /api/v1/render/pdf), or uncheck DocEngine Settings → Use External PDF.'
       );
     }
     Object instance = t.newInstance();

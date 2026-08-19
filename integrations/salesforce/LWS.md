@@ -24,7 +24,7 @@ DocEngine’s editor runs inside `lwc:dom="manual"` mount points and loads from 
 1. Create scratch org with LWS on (default for recent API versions).
 2. `npm run build:sf` → `sf project deploy start --source-dir apps/salesforce/force-app`.
 3. Assign `DocEngine_Admin`.
-4. Point Named Credential `DocEngine_Pdf` at a reachable pdf-service HTTPS URL.
+4. Point Named Credential `DocEngine_Pdf` at `https://docengine.pro` (API token as password).
 5. **Builder:** open `docEngineTemplateBuilder` on a `DocEngine_Template__c` record — palette, field drop, field mapping modal, save.
 6. **Filler:** open `docEngineFiller` on an Account (or matching object) — load template, merge, edit fields, Save, Save + PDF.
 7. Confirm no Lightning page chrome breakage when design mode is on.
@@ -39,4 +39,4 @@ Longer term: migrate CSS from `body.design-mode …` to `.doc-editor-root.design
 ## PDF callout (P4)
 
 - Client-side pdfmake is **not** in `DocEngineBundle` (5 MB Static Resource limit).
-- PDF = Apex `DocEnginePdfController.generateAndSavePdf` → Named Credential `DocEngine_Pdf` → `POST /pdf/generate` → `ContentVersion` on instance + source record.
+- PDF = Apex `DocEnginePdfController.generateAndSavePdf` → Named Credential `DocEngine_Pdf` → `POST /api/v1/render/pdf` → `ContentVersion` on instance + source record.

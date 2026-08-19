@@ -1,13 +1,12 @@
 /**
  * Runs inside DocEnginePdfViewer Static Resource (not under LWC/LWS).
- * Parent Lightning page posts: { type: 'docengine-pdf', base64: '...' }
+ * Parent posts { type: 'docengine-pdf', base64 }.
+ * Show those bytes with the browser native PDF plugin (same as Downloads).
  */
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-
-GlobalWorkerOptions.workerSrc = new URL('pdf.worker.min.js', window.location.href).href;
-
 const statusEl = document.getElementById('status');
-const pagesEl = document.getElementById('pages');
+const embedEl = document.getElementById('embed') as HTMLEmbedElement | null;
+
+let objectUrl: string | null = null;
 
 function setStatus(text: string) {
   if (!statusEl) return;
@@ -15,31 +14,28 @@ function setStatus(text: string) {
   statusEl.textContent = text || '';
 }
 
-async function renderBase64(base64: string) {
-  setStatus('Rendering PDF…');
-  if (pagesEl) pagesEl.innerHTML = '';
-
+function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
   const data = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     data[i] = binary.charCodeAt(i);
   }
+  return data;
+}
 
-  const pdf = await getDocument({ data }).promise;
-  setStatus('');
+function showNativePdf(base64: string) {
+  const bytes = base64ToBytes(base64);
+  const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = URL.createObjectURL(blob);
 
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.25 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    canvas.setAttribute('aria-label', `PDF page ${pageNum}`);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D context unavailable.');
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    pagesEl?.appendChild(canvas);
+  if (embedEl) {
+    embedEl.hidden = false;
+    embedEl.setAttribute('src', objectUrl);
+    setStatus('');
+    return;
   }
+  window.location.replace(objectUrl);
 }
 
 window.addEventListener('message', (event) => {
@@ -50,9 +46,12 @@ window.addEventListener('message', (event) => {
     return;
   }
   if (msg.type !== 'docengine-pdf' || typeof msg.base64 !== 'string') return;
-  renderBase64(msg.base64).catch((err) => {
-    setStatus(err?.message || String(err) || 'PDF render failed.');
-  });
+  try {
+    setStatus('Loading PDF…');
+    showNativePdf(msg.base64);
+  } catch (err: any) {
+    setStatus(err?.message || String(err) || 'PDF preview failed.');
+  }
 });
 
 window.parent.postMessage({ type: 'docengine-pdf-ready' }, '*');

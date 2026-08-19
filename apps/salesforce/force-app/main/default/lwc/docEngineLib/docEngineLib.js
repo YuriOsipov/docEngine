@@ -32,8 +32,8 @@ export async function ensureDocEngineAssets(component) {
   if (assetsByComponent.get(component)) {
     return;
   }
-  // LWS-safe PDF preview: pdf.js runs inside this Static Resource iframe.
-  window.__DOCENGINE_PDF_VIEWER_URL__ = `${pdfViewer}/viewer.html`;
+  // LWS-safe PDF preview: native browser PDF plugin inside Static Resource iframe.
+  window.__DOCENGINE_PDF_VIEWER_URL__ = `${pdfViewer}/viewer.html?v=4`;
   await Promise.all([loadStyle(component, editorCss), loadScript(component, editorJs)]);
   assetsByComponent.set(component, true);
 }
@@ -576,6 +576,8 @@ export async function generatePdfBlobFromApex(doc, options = {}) {
   try {
     const provider = await resolvePdfProvider();
     const documentJson = JSON.stringify(doc);
+    const templateJson =
+      options && options.template != null ? JSON.stringify(options.template) : null;
     let html = options && options.html;
     if (provider === 'Salesforce') {
       if (!html) {
@@ -583,7 +585,11 @@ export async function generatePdfBlobFromApex(doc, options = {}) {
       }
       html = normalizeHtmlForSalesforcePdf(html);
     }
-    const base64 = await generatePdfBase64({ documentJson, html: html || null });
+    const base64 = await generatePdfBase64({
+      documentJson,
+      html: html || null,
+      templateJson
+    });
     if (!base64) {
       throw new Error('PDF service returned an empty response.');
     }
@@ -688,7 +694,7 @@ export function createDocEditor(options) {
       documentActionsContainer,
       stickyChrome: false,
       ...(uiOptions || {}),
-      // LWS blocks blob: iframe.src — canvas preview instead
+      // LWS blocks blob: iframe.src — Static Resource viewer shows original PDF bytes
       embedPdfInIframe: false
     },
     fieldValueStyle: {

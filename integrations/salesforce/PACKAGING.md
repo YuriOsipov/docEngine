@@ -58,7 +58,7 @@ sf project deploy start --source-dir apps/salesforce/force-app-pdf
 sf org assign permset --name DocEngine_PDF_User
 ```
 
-Configure Named Credential `DocEngine_Pdf` to your pdf-service HTTPS URL.
+Configure Named Credential `DocEngine_Pdf` to `https://docengine.pro` and store a `de_…` API token as the credential password.
 
 See [PDF_PACKAGE.md](./PDF_PACKAGE.md) and [PDF.md](./PDF.md).
 

@@ -13,7 +13,7 @@ export const isClientPdfAvailable = false;
 export async function generateDocumentPdfBlob(_doc, _options = {}) {
   throw new Error(
     'Client-side PDF is not available in the Salesforce bundle. ' +
-      'Configure Named Credential DocEngine_Pdf and use Apex DocEnginePdfController, ' +
+      'Configure Named Credential DocEngine_Pdf (DocEngine.pro /api/v1/render/pdf) and use Apex DocEnginePdfController, ' +
       'or pass generatePdfBlob to createEditor.',
   );
 }

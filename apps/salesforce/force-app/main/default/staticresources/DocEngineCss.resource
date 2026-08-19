@@ -37,6 +37,13 @@
   display: none !important;
 }
 
+/* Author .schema-form__row { display: flex } beats UA [hidden]. */
+.schema-form__row[hidden],
+.image-modal__browse-row[hidden],
+.image-modal__preview[hidden] {
+  display: none !important;
+}
+
 .btn-primary {
   background: #4a7ab5;
   border-color: #3a6a9f;
@@ -997,6 +1004,15 @@ body.document-columns-col-resize-active .field-token {
   font-size: var(--me-table-font-size);
 }
 
+.vision-table .field-token--cell {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vision-table .field-token--cell.field-token--computed {
+  white-space: nowrap;
+}
+
 /* Fill mode: values read like document text, not hyperlinks */
 .document-section__body .field-token:not(.field-token--design),
 .vision-table .field-token--cell:not(.field-token--design) {
@@ -1013,7 +1029,7 @@ body.document-columns-col-resize-active .field-token {
 
 /* Fill mode: underline all field values with configured highlight color */
 .editor-holder--show-fields .document-section__body .field-token:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image):not(.field-token--required-missing),
-.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--readonly):not(.field-token--required-missing) {
+.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--required-missing) {
   text-decoration: underline;
   text-decoration-color: var(--me-field-fill-color, #0000FF);
   text-decoration-thickness: var(--me-field-fill-border-width, 1px);
@@ -1215,6 +1231,8 @@ body.document-columns-col-resize-active .field-token {
 .vision-table td {
   border: 1px solid #999;
   padding: 4px 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .vision-table--borderless th,
@@ -1231,7 +1249,7 @@ body.document-columns-col-resize-active .field-token {
   color: inherit;
   text-transform: none;
   letter-spacing: normal;
-  text-align: inherit;
+  text-align: center;
   position: relative;
 }
 
@@ -1785,6 +1803,23 @@ body.design-mode .ce-block__content {
 body.modal-resize-active {
   user-select: none;
   cursor: nwse-resize;
+}
+
+.modal--movable .modal__header {
+  cursor: grab;
+  touch-action: none;
+}
+
+.modal--dragging .modal__header,
+body.modal-move-active {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* After drag, leave flex centering so left/top stick. */
+.modal--moved {
+  position: absolute;
+  margin: 0;
 }
 
 .modal--tree .modal__body {
@@ -3790,7 +3825,7 @@ body.field-mapping-split-active {
   color: inherit;
   text-transform: none;
   letter-spacing: normal;
-  text-align: inherit;
+  text-align: center;
 }
 
 .preview-document .vision-table .field-token--cell {
@@ -4650,7 +4685,7 @@ body.field-mapping-split-active {
 }
 
 .editor-holder--show-fields .document-section__body .field-token:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--repeater):not(.field-token--image):not(.field-token--required-missing),
-.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--readonly):not(.field-token--required-missing) {
+.editor-holder--show-fields .vision-table .field-token--cell:not(.field-token--design):not(.field-token--computed):not(.field-token--readonly):not(.field-token--required-missing) {
   text-decoration: none;
   cursor: pointer;
 }
