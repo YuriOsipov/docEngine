@@ -116,8 +116,13 @@ export function createPdfRenderContext(doc: EditorDocument, options: PdfRenderOp
   };
 }
 
+export function isHideTitleInPreview(data: any): boolean {
+  const value = data?.hideTitleInPreview;
+  return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true';
+}
+
 export function resolveVisibleSectionLabel(data: any): string {
-  if (!data || data.hideTitleInPreview) return '';
+  if (!data || isHideTitleInPreview(data)) return '';
   return String(data.label ?? '').trim();
 }
 

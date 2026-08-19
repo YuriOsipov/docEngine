@@ -1793,6 +1793,57 @@ describe('renderDocumentToPdfContent multipage', () => {
     assert.ok(chunkContainsText({ stack: (docDefinition as any).content }, 'GoldenDent'));
   });
 
+  it('omits section header nodes when hideTitleInPreview is the string true', () => {
+    const doc = {
+      kind: 'document',
+      version: 2,
+      time: Date.now(),
+      fieldSchemas: {},
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Header',
+            hideTitleInPreview: 'true',
+            segments: [{ type: 'text', content: 'Invoice body' }],
+            fieldValues: {},
+          },
+        },
+      ],
+    };
+
+    const { docDefinition } = renderDocumentToPdfDefinition(doc, defaultRenderOptions);
+    const titleHeaders = collectNodesWithStyle((docDefinition as any).content, 'sectionHeader');
+    assert.equal(titleHeaders.length, 0);
+    assert.ok(chunkContainsText({ stack: (docDefinition as any).content }, 'Invoice body'));
+  });
+
+  it('formats date fields with the default display format instead of ISO', () => {
+    const doc = {
+      kind: 'document',
+      version: 2,
+      time: Date.now(),
+      fieldSchemas: {
+        order_date: { type: 'date', label: 'Date', name: 'Date', dateFormat: 'dd/mm/yyyy' },
+      },
+      blocks: [
+        {
+          type: 'documentSection',
+          data: {
+            label: 'Header',
+            hideTitleInPreview: true,
+            segments: [{ type: 'field', id: 'order_date' }],
+            fieldValues: { order_date: '2026-08-19' },
+          },
+        },
+      ],
+    };
+
+    const { docDefinition } = renderDocumentToPdfDefinition(doc, defaultRenderOptions);
+    assert.ok(chunkContainsText({ stack: (docDefinition as any).content }, '19/08/2026'));
+    assert.equal(chunkContainsText({ stack: (docDefinition as any).content }, '2026-08-19'), false);
+  });
+
   it('keeps newline characters inline within header prose blocks', () => {
     const doc = {
       kind: 'document',

@@ -730,7 +730,11 @@ export async function resolveCreateDocEditorOptions(options = {}) {
       options.generatePdfBlob !== undefined
         ? options.generatePdfBlob
         : pdfOk
-          ? generatePdfBlobFromApex
+          ? (doc, opts = {}) =>
+              generatePdfBlobFromApex(doc, {
+                ...opts,
+                template: opts.template ?? rest.data ?? rest.defaultDocument,
+              })
           : null,
     pdfAvailable: options.pdfAvailable !== undefined ? options.pdfAvailable : pdfOk
   };
