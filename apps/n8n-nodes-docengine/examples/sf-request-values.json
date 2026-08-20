@@ -1,0 +1,54 @@
+{
+  "template": {
+    "kind": "template",
+    "time": 0,
+    "blocks": [
+      {
+        "id": "sec1",
+        "type": "documentSection",
+        "data": {
+          "name": "Main",
+          "label": "Main"
+        }
+      },
+      {
+        "id": "f1",
+        "type": "field",
+        "data": {
+          "name": "patientName",
+          "label": "Patient name",
+          "fieldType": "text",
+          "section": "Main"
+        }
+      },
+      {
+        "id": "f2",
+        "type": "field",
+        "data": {
+          "name": "visitDate",
+          "label": "Visit date",
+          "fieldType": "date",
+          "section": "Main"
+        }
+      }
+    ],
+    "fieldSchemas": {
+      "patientName": { "type": "text", "label": "Patient name" },
+      "visitDate": { "type": "date", "label": "Visit date" }
+    },
+    "pageSetup": {
+      "format": "a4",
+      "orientation": "portrait"
+    }
+  },
+  "document": {
+    "kind": "field",
+    "version": 2,
+    "sections": {
+      "Main": {
+        "patientName": "Jane Doe",
+        "visitDate": "2026-08-20"
+      }
+    }
+  }
+}

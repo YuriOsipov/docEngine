@@ -16,28 +16,51 @@ Link or copy into your n8n `custom` / community nodes folder per [n8n docs](http
 
 ## Salesforce / custom app → PDF
 
-Salesforce **DocEngine_PDF** calls DocEngine.pro `POST /api/v1/render/pdf` (see [PDF.md](../../integrations/salesforce/PDF.md)).
+Salesforce **DocEngine_PDF** calls `POST /api/v1/render/pdf` (see [PDF.md](../../integrations/salesforce/PDF.md)).
 
-Use this node when you want PDFs on **your** n8n host instead. The webhook path must match Apex (`/api/v1/render/pdf`) or you change `GENERATE_PATH` in `DocEnginePdfCallout`.
+Use this node when you want PDFs on **your** n8n host. The webhook path must match Apex (`/api/v1/render/pdf`) or change `GENERATE_PATH` in `DocEnginePdfCallout`.
+
+Apex sends two body shapes (`DocEnginePdfCallout.buildRenderBody`):
+
+| Shape | Body | Handle with |
+|-------|------|-------------|
+| Values-only (Save + PDF) | `{ "template", "document" }` (no blocks) | **DocEngine** node |
+| Full page (preview / filled) | `{ "doc", "document" }` with `blocks` | Forward to docengine-web / pdf-service |
+
+### Importable example (recommended)
+
+See [`examples/`](./examples/) — workflow JSON, sample requests, and setup:
 
 ```text
-Salesforce or custom app
+Salesforce Named Credential
   → Webhook (POST /api/v1/render/pdf)
+  → IF has blocks?
+       YES → HTTP Request → docengine-web /api/v1/render/pdf
+       NO  → DocEngine (body.template + body.document → PDF)
+  → Respond to Webhook (binary PDF)
+```
+
+Import `examples/salesforce-render-pdf.workflow.json` in n8n, set `DOCENGINE_PDF_BASE_URL` + `DOCENGINE_API_TOKEN`, activate, point Named Credential `DocEngine_Pdf` at the n8n origin (no trailing slash).
+
+### Values-only only (minimal)
+
+```text
+Webhook (POST /api/v1/render/pdf)
   → DocEngine
        Template Source: From incoming
-       Template JSON Path: template
-       Values JSON Path: document
+       Template JSON Path: body.template
+       Values JSON Path: body.document
        Output format: PDF
   → Respond to Webhook (binary PDF)
 ```
 
-Salesforce posts `{ "template", "document" }` or a full `{ "doc" }` with `blocks` + `pageSetup`.
+Does **not** cover SF preview payloads with `blocks` — use the branched example for full parity.
 
 ### Payload + field mapping
 
 If the template includes `fieldMapping` and the body has a Salesforce-style source object:
 
-- Values JSON Path: `payload` (or leave empty if the item *is* the payload)
+- Values JSON Path: `body.payload` (or leave empty if the item *is* the payload)
 - Enable **Use Template Field Mapping**
 
 ## Node options

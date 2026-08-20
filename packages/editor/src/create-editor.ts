@@ -223,8 +223,8 @@ function migrateBlocks(blocks: any,options: any = {}) {
             label: String(row.label ?? ''),
           }))
         : [
-            { key: 'od', label: 'OD' },
-            { key: 'os', label: 'OS' },
+            { key: 'row1', label: '' },
+            { key: 'row2', label: '' },
           ];
 
       return {

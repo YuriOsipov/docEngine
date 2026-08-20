@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { cellFieldId } from '@docengine/editor';
 import { ophthalmologySchemas } from './ophthalmology-schemas.js';
 
 const examSegments = [
@@ -133,12 +134,15 @@ export function createOphthalmologyTemplate({ withExamples = true } = {}) {
               type: 'table',
               id: 'visionTable',
               rows: [
-                { key: 'od', label: 'OD' },
-                { key: 'os', label: 'OS' },
+                { key: 'row1', label: '' },
+                { key: 'row2', label: '' },
               ],
             },
           ],
-          fieldValues: {},
+          fieldValues: {
+            [cellFieldId('visionTable', 'row1', 'name')]: 'OD',
+            [cellFieldId('visionTable', 'row2', 'name')]: 'OS',
+          },
         },
       },
       {

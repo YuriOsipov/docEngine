@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { cellFieldId } from '@docengine/editor';
+import { buildTableColumnsFromLabels, cellFieldId } from '@docengine/editor';
 
 function choice(name, label, commonListId) {
   return { type: 'choice', name, label, multi: false, commonListId };
@@ -84,17 +84,15 @@ const schemas = {
 };
 
 const visionTableId = 'visionTable';
-const visionColumns = [
-  { key: 'vis', label: 'vis' },
-  { key: 'sph', label: 'Sph' },
-  { key: 'cyl', label: 'Cyl' },
-  { key: 'ax', label: 'Ax' },
-  { key: 'vis2', label: 'Vis' },
-  { key: 'bo', label: 'B/B' },
-];
+const visionColumns = buildTableColumnsFromLabels(
+  ['Eye', 'vis', 'Sph', 'Cyl', 'Ax', 'Vis', 'B/B'],
+  [],
+  [],
+  ['name', 'vis', 'sph', 'cyl', 'ax', 'vis2', 'bo'],
+);
 const visionRows = [
-  { key: 'od', label: 'OD' },
-  { key: 'os', label: 'OS' },
+  { key: 'row1', label: '' },
+  { key: 'row2', label: '' },
 ];
 
 const columnListMap = {
@@ -112,7 +110,6 @@ schemas[visionTableId] = {
   label: 'Visual acuity',
   columns: visionColumns,
   rows: visionRows,
-  showRowLabels: true,
   cellType: 'choice',
   cellCommonListId: 'acuity',
 };
@@ -120,7 +117,20 @@ schemas[visionTableId] = {
 for (const row of visionRows) {
   for (const col of visionColumns) {
     const id = cellFieldId(visionTableId, row.key, col.key);
-    schemas[id] = choice(col.label, col.label, columnListMap[col.key] ?? 'acuity');
+    if (col.key === 'name') {
+      schemas[id] = {
+        type: 'text',
+        name: col.name,
+        label: col.label,
+        defaultText: '',
+        readonly: true,
+      };
+      continue;
+    }
+    schemas[id] = {
+      ...choice(col.label, col.label, columnListMap[col.key] ?? 'acuity'),
+      displayStyle: { textAlign: 'center' },
+    };
   }
 }
 
