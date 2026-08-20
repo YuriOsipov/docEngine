@@ -1286,7 +1286,7 @@ body.document-columns-col-resize-active .field-token {
 }
 
 /* Body column guides in design mode (resizers only exist then). */
-.vision-table:has(.vision-table__col-resizer) > tbody > tr > td:not(.vision-table__row-actions):not(.vision-table__row-label):not(:last-child) {
+.vision-table:has(.vision-table__col-resizer) > tbody > tr > td:not(.vision-table__row-label):not(:last-child) {
   box-shadow: inset -1px 0 0 #cbd5e1;
 }
 
@@ -1310,9 +1310,36 @@ body.vision-table-col-resize-active .field-token {
   pointer-events: none;
 }
 
-.vision-table__actions-head {
-  width: 32px;
-  padding: 4px;
+.vision-table td.vision-table__cell--with-remove {
+  position: relative;
+  padding-right: 20px;
+  overflow: visible;
+}
+
+.vision-table .vision-table__row-remove {
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  z-index: 2;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.vision-table .vision-table__row-remove:hover {
+  background: #fee;
+  color: #c44;
 }
 
 .vision-table__row-label-head {
@@ -1326,30 +1353,6 @@ body.vision-table-col-resize-active .field-token {
   font-weight: 600;
   white-space: nowrap;
   vertical-align: middle;
-}
-
-.vision-table__row-actions {
-  width: 32px;
-  padding: 2px;
-  text-align: center;
-  vertical-align: middle;
-}
-
-.vision-table__row-remove {
-  border: 1px solid #c44;
-  background: #fff;
-  color: #c44;
-  font-size: 14px;
-  line-height: 1;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.vision-table__row-remove:hover {
-  background: #fee;
 }
 
 .repeater-block {
@@ -5766,19 +5769,23 @@ body.design-mode .ce-block--selected .ce-block__content {
   background: var(--me-primary);
 }
 
-.vision-table__row-remove {
+.vision-table td.vision-table__cell--with-remove {
+  padding-right: 20px;
+}
+
+.vision-table .vision-table__row-remove {
   border: none;
   background: transparent;
   color: #94a3b8;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  font-size: 18px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 14px;
   line-height: 1;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.vision-table__row-remove:hover {
+.vision-table .vision-table__row-remove:hover {
   background: #fef2f2;
   color: #ef4444;
 }

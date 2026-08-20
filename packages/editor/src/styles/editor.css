@@ -1289,7 +1289,7 @@ body.document-columns-col-resize-active .field-token {
 }
 
 /* Body column guides in design mode (resizers only exist then). */
-.vision-table:has(.vision-table__col-resizer) > tbody > tr > td:not(.vision-table__row-actions):not(.vision-table__row-label):not(:last-child) {
+.vision-table:has(.vision-table__col-resizer) > tbody > tr > td:not(.vision-table__row-label):not(:last-child) {
   box-shadow: inset -1px 0 0 #cbd5e1;
 }
 
@@ -1313,9 +1313,36 @@ body.vision-table-col-resize-active .field-token {
   pointer-events: none;
 }
 
-.vision-table__actions-head {
-  width: 32px;
-  padding: 4px;
+.vision-table td.vision-table__cell--with-remove {
+  position: relative;
+  padding-right: 20px;
+  overflow: visible;
+}
+
+.vision-table .vision-table__row-remove {
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  z-index: 2;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.vision-table .vision-table__row-remove:hover {
+  background: #fee;
+  color: #c44;
 }
 
 .vision-table__row-label-head {
@@ -1329,30 +1356,6 @@ body.vision-table-col-resize-active .field-token {
   font-weight: 600;
   white-space: nowrap;
   vertical-align: middle;
-}
-
-.vision-table__row-actions {
-  width: 32px;
-  padding: 2px;
-  text-align: center;
-  vertical-align: middle;
-}
-
-.vision-table__row-remove {
-  border: 1px solid #c44;
-  background: #fff;
-  color: #c44;
-  font-size: 14px;
-  line-height: 1;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.vision-table__row-remove:hover {
-  background: #fee;
 }
 
 .repeater-block {
@@ -3815,10 +3818,32 @@ body.field-mapping-split-active {
   color: inherit;
 }
 
-.preview-document .vision-table {
+.preview-document .document-table,
+.preview-document .vision-table-block,
+.preview-document .preview-document__block {
+  display: block;
   width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.preview-document .vision-table {
+  display: table;
+  width: 100%;
+  min-width: 100%;
+  max-width: none;
   table-layout: fixed;
   border-collapse: collapse;
+  white-space: normal;
+}
+
+.preview-document .vision-table col:last-child,
+.preview-document .vision-table thead th:last-child,
+.preview-document .vision-table tbody td:last-child {
+  width: auto;
+  min-width: 0;
+  max-width: none;
 }
 
 .preview-document .vision-table th {
@@ -3839,7 +3864,8 @@ body.field-mapping-split-active {
 
 .preview-document .vision-table th,
 .preview-document .vision-table td {
-  overflow: hidden;
+  overflow: visible;
+  white-space: normal;
 }
 
 .preview-document .vision-table--borderless th,

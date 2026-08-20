@@ -1362,19 +1362,23 @@ body.design-mode .ce-block--selected .ce-block__content {
   background: var(--me-primary);
 }
 
-.vision-table__row-remove {
+.vision-table td.vision-table__cell--with-remove {
+  padding-right: 20px;
+}
+
+.vision-table .vision-table__row-remove {
   border: none;
   background: transparent;
   color: #94a3b8;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  font-size: 18px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 14px;
   line-height: 1;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.vision-table__row-remove:hover {
+.vision-table .vision-table__row-remove:hover {
   background: #fef2f2;
   color: #ef4444;
 }

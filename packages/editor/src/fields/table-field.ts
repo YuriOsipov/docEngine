@@ -25,9 +25,10 @@ import {
 } from './inline-fields.js';
 import { createInlineRepeaterSeedValue } from './repeater-field.js';
 import {
-  TABLE_ROW_ACTIONS_COL_WIDTH_PX,
   TABLE_ROW_LABEL_COL_WIDTH,
   getTableDataColElements,
+  getTableDataHeaderCells,
+  scalePercentCssWidthsToFill,
   schemaWidthToColCss,
   wireTableColumnResize,
 } from './wire-table-column-resize.js';
@@ -91,19 +92,48 @@ function resolveCellValue(cellId: any, fieldValues: any, fieldSchemas: any, bloc
   return filled;
 }
 
-function applyColumnWidth(el: any, col: any, { pin = false }: any = {}) {
-  const width = schemaWidthToColCss(col?.width);
+function applyColumnWidthCss(el: any, width: any, { pin = false }: any = {}) {
   if (!width) return;
-
   el.style.width = width;
-
-  // Pin only on `<col>`: min/max on every cell fights table-layout:fixed.
+  if (el.tagName === 'COL') el.setAttribute('width', width);
   if (!pin) return;
   el.style.minWidth = width;
-  el.style.maxWidth = width;
+  el.style.maxWidth = '';
 }
 
-function buildColgroup(tableSchema: any, includeRowActions: any, includeRowLabels = false) {
+function clearColumnWidthCss(el: any) {
+  if (!el) return;
+  el.style.width = '';
+  el.style.minWidth = '';
+  el.style.maxWidth = '';
+  if (el.tagName === 'COL') el.removeAttribute('width');
+}
+
+function applyScaledWidthsToCols(colEls: any, scaledWidths: any) {
+  const last = colEls.length - 1;
+  colEls.forEach((colEl: any, index: any) => {
+    clearColumnWidthCss(colEl);
+    // Last data column stays auto so leftover table width fills to the page edge.
+    if (index === last && last > 0) return;
+    applyColumnWidthCss(colEl, scaledWidths[index], { pin: true });
+  });
+}
+
+function syncHeaderWidthsFromColgroup(table: any) {
+  const widths = getTableDataColElements(table).map((colEl: any) =>
+    String(colEl?.style?.width ?? '').trim(),
+  );
+  const last = widths.length - 1;
+  getTableDataHeaderCells(table).forEach((th: any, index: any) => {
+    if (index === last && last > 0) {
+      th.style.width = '';
+      return;
+    }
+    if (widths[index]) th.style.width = widths[index];
+  });
+}
+
+function buildColgroup(tableSchema: any, includeRowLabels = false) {
   const colgroup = document.createElement('colgroup');
   if (includeRowLabels) {
     const labelCol = document.createElement('col');
@@ -111,16 +141,13 @@ function buildColgroup(tableSchema: any, includeRowActions: any, includeRowLabel
     labelCol.style.width = TABLE_ROW_LABEL_COL_WIDTH;
     colgroup.appendChild(labelCol);
   }
-  for (const col of tableSchema.columns ?? []) {
-    const colEl = document.createElement('col');
-    applyColumnWidth(colEl, col, { pin: true });
-    colgroup.appendChild(colEl);
-  }
-  if (includeRowActions) {
-    const actionsCol = document.createElement('col');
-    actionsCol.style.width = `${TABLE_ROW_ACTIONS_COL_WIDTH_PX}px`;
-    colgroup.appendChild(actionsCol);
-  }
+  const dataCols = tableSchema.columns ?? [];
+  const scaledWidths = scalePercentCssWidthsToFill(
+    dataCols.map((col: any) => schemaWidthToColCss(col?.width)),
+  );
+  const colEls = dataCols.map(() => document.createElement('col'));
+  applyScaledWidthsToCols(colEls, scaledWidths);
+  colEls.forEach((colEl: any) => colgroup.appendChild(colEl));
   return colgroup;
 }
 
@@ -130,14 +157,16 @@ export function applyTableColumnWidthsToElement(tableOrWrapper: any, columns: an
     : tableOrWrapper?.querySelector?.('.vision-table');
   if (!table) return;
   const colEls = getTableDataColElements(table);
-  (columns ?? []).forEach((col: any, index: any) => {
+  const scaledWidths = scalePercentCssWidthsToFill(
+    (columns ?? []).map((col: any) => schemaWidthToColCss(col?.width)),
+  );
+  (columns ?? []).forEach((_col: any, index: any) => {
     const colEl = colEls[index];
     if (!colEl) return;
-    colEl.style.width = '';
-    colEl.style.minWidth = '';
-    colEl.style.maxWidth = '';
-    applyColumnWidth(colEl, col, { pin: true });
+    clearColumnWidthCss(colEl);
   });
+  applyScaledWidthsToCols(colEls, scaledWidths);
+  syncHeaderWidthsFromColgroup(table);
 }
 
 export function syncTableRowsDataset(tableWrapper: any, rows: any) {
@@ -345,17 +374,22 @@ function buildTableRowElement(row: any, tableFieldId: any, tableSchema: any, fie
   }
 
   if (editable) {
-    const actionsTd = document.createElement('td');
-    actionsTd.className = 'vision-table__row-actions';
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'vision-table__row-remove';
-    removeBtn.dataset.action = 'remove-table-row';
-    removeBtn.dataset.rowKey = row.key;
-    removeBtn.title = 'Remove row';
-    removeBtn.textContent = '×';
-    actionsTd.appendChild(removeBtn);
-    tr.appendChild(actionsTd);
+    const dataCells = [...tr.querySelectorAll(':scope > td')].filter(
+      (td: any) => !td.classList.contains('vision-table__row-label'),
+    );
+    const lastTd = dataCells[dataCells.length - 1];
+    if (lastTd) {
+      lastTd.classList.add('vision-table__cell--with-remove');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'vision-table__row-remove';
+      removeBtn.dataset.action = 'remove-table-row';
+      removeBtn.dataset.rowKey = row.key;
+      removeBtn.title = 'Remove row';
+      removeBtn.setAttribute('aria-label', 'Remove row');
+      removeBtn.textContent = '×';
+      lastTd.appendChild(removeBtn);
+    }
   }
 
   return tr;
@@ -372,7 +406,7 @@ function appendColumnResizer(th: any, colIndex: any) {
   th.appendChild(handle);
 }
 
-function buildTableHead(tableFieldId: any, tableSchema: any, includeRowActions: any, options: any = {}) {
+function buildTableHead(tableFieldId: any, tableSchema: any, options: any = {}) {
   const fieldSchemas =
     options.fieldSchemas ?? options.getRegistry?.()?.getFieldSchemas?.() ?? {};
   const documentTextStyle =
@@ -413,18 +447,17 @@ function buildTableHead(tableFieldId: any, tableSchema: any, includeRowActions: 
     if (withResizers && colIndex < columns.length - 1) appendColumnResizer(th, colIndex);
     headerRow.appendChild(th);
   });
-  if (includeRowActions) {
-    const th = document.createElement('th');
-    th.className = 'vision-table__actions-head';
-    th.setAttribute('aria-label', 'Row actions');
-    headerRow.appendChild(th);
-  }
   thead.appendChild(headerRow);
   return thead;
 }
 
 function applyTablePresentation(table: any, tableSchema: any, { forceVisibleChrome = false }: any = {}) {
   table.className = 'vision-table';
+  table.style.width = '100%';
+  table.style.minWidth = '100%';
+  table.style.maxWidth = 'none';
+  table.style.tableLayout = 'fixed';
+  table.style.whiteSpace = 'normal';
   if (!forceVisibleChrome && tableSchema?.hideBorders) {
     table.classList.add('vision-table--borderless');
   }
@@ -454,13 +487,13 @@ export function buildTableElement(tableFieldId: any, fieldValues: any, options: 
   // even when hideHeader / hideBorders are set for fill/preview/PDF.
   applyTablePresentation(table, tableSchema, { forceVisibleChrome: !!designMode });
   const includeRowLabels = shouldShowRowLabels(tableSchema, tableRows);
-  table.appendChild(buildColgroup(tableSchema, editable, includeRowLabels));
+  table.appendChild(buildColgroup(tableSchema, includeRowLabels));
 
   // Resize is available whenever design mode shows a real header (always).
   const allowResize = !!designMode;
   if (designMode || !tableSchema.hideHeader) {
     table.appendChild(
-      buildTableHead(tableFieldId, tableSchema, editable, {
+      buildTableHead(tableFieldId, tableSchema, {
         ...options,
         withResizers: allowResize,
         includeRowLabels,
@@ -476,6 +509,7 @@ export function buildTableElement(tableFieldId: any, fieldValues: any, options: 
     );
   }
   table.appendChild(tbody);
+  syncHeaderWidthsFromColgroup(table);
 
   if (allowResize) {
     wireTableColumnResize(table, {
@@ -554,10 +588,10 @@ export function buildPreviewTableElement(tableFieldId: any, fieldValues: any, op
   const includeRowLabels = shouldShowRowLabels(tableSchema, tableRows);
   const table = document.createElement('table');
   applyTablePresentation(table, tableSchema);
-  table.appendChild(buildColgroup(tableSchema, false, includeRowLabels));
+  table.appendChild(buildColgroup(tableSchema, includeRowLabels));
   if (!tableSchema.hideHeader) {
     table.appendChild(
-      buildTableHead(tableFieldId, tableSchema, false, {
+      buildTableHead(tableFieldId, tableSchema, {
         fieldSchemas,
         fieldValueStyle: previewContext?.fieldValueStyle,
         documentTextStyle: previewContext?.documentTextStyle ?? previewContext?.getDocumentTextStyle?.(),
@@ -617,6 +651,7 @@ export function buildPreviewTableElement(tableFieldId: any, fieldValues: any, op
   if (!tbody.childNodes.length && !showEmptyRows) return null;
 
   table.appendChild(tbody);
+  syncHeaderWidthsFromColgroup(table);
   return table;
 }
 

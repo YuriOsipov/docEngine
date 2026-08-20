@@ -35,4 +35,24 @@ describe('tableColumnWidthsFromSchema', () => {
       ['80%', '20%'],
     );
   });
+
+  it('scales percent widths that do not fill the table', () => {
+    assert.deepEqual(
+      tableColumnWidthsFromSchema([
+        { key: 'product', width: '42%' },
+        { key: 'total', width: '17%' },
+      ]),
+      ['71.2%', '28.8%'],
+    );
+  });
+
+  it('leaves a star column to absorb leftover space', () => {
+    assert.deepEqual(
+      tableColumnWidthsFromSchema([
+        { key: 'name', width: '40%' },
+        { key: 'amount', width: 'auto' },
+      ]),
+      ['40%', '*'],
+    );
+  });
 });

@@ -314,6 +314,8 @@ function walkInlineNodes(node: any, styleStack: Record<string, any>[], ctx: PdfC
 
   if (isHiddenEmptyPreviewToken(el, ctx)) return;
 
+  if (el.tagName === 'BUTTON' || el.classList?.contains('vision-table__row-remove')) return;
+
   if (el.tagName === 'BR') {
     parts.push('\n');
     return;

@@ -17,7 +17,7 @@ describe('preview-html-styles', () => {
     assert.match(css, /\.document-section__header\s*\{/);
     assert.match(css, /\.document-section--border-top/);
     assert.match(css, /\.vision-table\s*,/);
-    assert.match(css, /border-collapse:\s*collapse/);
+    assert.match(css, /white-space:\s*normal/);
     assert.doesNotMatch(css, /<\/style/i);
   });
 

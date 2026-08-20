@@ -1,5 +1,4 @@
 const MIN_COLUMN_WIDTH_PX = 40;
-export const TABLE_ROW_ACTIONS_COL_WIDTH_PX = 32;
 export const TABLE_ROW_LABEL_COL_WIDTH = '3em';
 
 /**
@@ -49,10 +48,9 @@ export function applyColElementWidthPx(colEl: any, widthPx: any) {
   colEl.style.maxWidth = width;
 }
 
-export function chromeCssPartsFromFlags({ includeRowActions = false, includeRowLabels = false }: any = {}) {
+export function chromeCssPartsFromFlags({ includeRowLabels = false }: any = {}) {
   const parts: string[] = [];
   if (includeRowLabels) parts.push(TABLE_ROW_LABEL_COL_WIDTH);
-  if (includeRowActions) parts.push(`${TABLE_ROW_ACTIONS_COL_WIDTH_PX}px`);
   return parts;
 }
 
@@ -64,6 +62,26 @@ export function chromeCssPartsFromFlags({ includeRowActions = false, includeRowL
 export function percentToColWidthCss(percent: any) {
   if (!Number.isFinite(percent)) return '';
   return `${Math.round(percent * 10) / 10}%`;
+}
+
+/**
+ * When every data column is a percent and they do not add up to 100%, scale
+ * them so the table fills its page (old templates reserved space for a wide
+ * row-actions column). Mixed `auto` / `px` lists are left unchanged.
+ * @param {string[]} cssWidths
+ * @returns {string[]}
+ */
+export function scalePercentCssWidthsToFill(cssWidths: any) {
+  const list = [...(cssWidths ?? [])];
+  if (!list.length) return list;
+  const percents = list.map((width: any) => {
+    const match = String(width ?? '').trim().match(/^(\d+(?:\.\d+)?)%$/);
+    return match ? Number(match[1]) : null;
+  });
+  if (percents.some((value: any) => value == null)) return list;
+  const sum = percents.reduce((total: any, value: any) => total + value, 0);
+  if (!(sum > 0) || Math.abs(sum - 100) < 0.15) return list;
+  return percents.map((value: any) => percentToColWidthCss((value / sum) * 100));
 }
 
 /**
@@ -89,7 +107,7 @@ export function applyColElementWidthPercent(colEl: any, percent: any) {
   if (!width) return;
   colEl.style.width = width;
   colEl.style.minWidth = width;
-  colEl.style.maxWidth = width;
+  colEl.style.maxWidth = '';
 }
 
 export function getTableDataHeaderCells(tableEl: any) {
@@ -144,31 +162,27 @@ export function measureTableWidthPx(tableEl: any) {
 }
 
 /**
- * Convert absolute pixel widths to percentages of the table width.
- * `%` on `<col>` is relative to the full table (including row-actions), so the
- * denominator must be the table width — not only the sum of data columns.
+ * Convert absolute pixel widths to percentages of the data columns.
+ * The row-actions control is a fixed px strip and must not steal leftover
+ * percent, or preview/PDF tables leave a gap on the right.
  *
  * @param {number[]} widthsPx
- * @param {number} tableWidthPx
+ * @param {number} [tableWidthPx]
  * @returns {Array<number | null>}
  */
 export function widthsPxToPercents(widthsPx: any, tableWidthPx: any) {
-  const tableWidth = Number(tableWidthPx);
-  if (Number.isFinite(tableWidth) && tableWidth > 0) {
-    return (widthsPx ?? []).map((w: any) => {
-      if (!Number.isFinite(w) || w <= 0) return null;
-      return Math.round(((w / tableWidth) * 100) * 10) / 10;
-    });
-  }
-
-  const total = (widthsPx ?? []).reduce(
+  const fromCols = (widthsPx ?? []).reduce(
     (sum: any, w: any) => sum + (Number.isFinite(w) && w > 0 ? w : 0),
     0,
   );
-  if (total <= 0) return (widthsPx ?? []).map((): any => null);
-  return widthsPx.map((w: any) => {
+  const tableWidth = Number(tableWidthPx);
+  const denominator = fromCols > 0
+    ? fromCols
+    : (Number.isFinite(tableWidth) && tableWidth > 0 ? tableWidth : 0);
+  if (!(denominator > 0)) return (widthsPx ?? []).map((): any => null);
+  return (widthsPx ?? []).map((w: any) => {
     if (!Number.isFinite(w) || w <= 0) return null;
-    return Math.round(((w / total) * 100) * 10) / 10;
+    return Math.round(((w / denominator) * 100) * 10) / 10;
   });
 }
 

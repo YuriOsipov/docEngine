@@ -65,8 +65,8 @@ describe('generateHtmlFromTemplate', () => {
       fullDocument: true,
     });
 
-    assert.match(html, /\.preview-document \.vision-table\{width:100%/);
-    assert.match(html, /class="document-table"[^>]*>[\s\S]*<table class="vision-table">/);
+    assert.match(html, /\.preview-document \.vision-table\{[^}]*width:100%/);
+    assert.match(html, /class="document-table"[^>]*>[\s\S]*<table[^>]*class="vision-table"/);
     assert.match(html, new RegExp(`data-field-id="${cell1}"`));
     assert.match(html, new RegExp(`data-field-id="${cell2}"`));
     assert.doesNotMatch(html, /\.document-table\{width:100%/);

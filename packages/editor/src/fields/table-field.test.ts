@@ -108,12 +108,17 @@ describe('table column widths', () => {
       tableRows: [{ key: 'row1', label: '' }],
     });
     const cols = [...table.querySelectorAll(':scope > colgroup > col')];
-    assert.equal(cols.length, 3);
-    assert.equal(cols[0].style.width, '42%');
-    assert.equal(cols[1].style.width, '17%');
-    assert.equal(cols[2].style.width, '32px');
+    assert.equal(cols.length, 2);
+    assert.equal(cols[0].style.width, '71.2%');
+    assert.ok(!cols[1].style.width);
     assert.equal(cols[0].style.minWidth, cols[0].style.width);
-    assert.equal(cols[0].style.maxWidth, cols[0].style.width);
+    assert.equal(cols[0].style.maxWidth, '');
+    assert.equal(table.querySelector('th')?.style.width, '71.2%');
+    assert.ok(!table.querySelector('td:last-child')?.style.width);
+    const removeBtn = table.querySelector('[data-action="remove-table-row"]');
+    assert.ok(removeBtn);
+    assert.ok(removeBtn?.closest('td')?.classList.contains('vision-table__cell--with-remove'));
+    assert.equal(table.querySelectorAll('td.vision-table__row-actions').length, 0);
   });
 
   it('keeps plain percent widths in preview (no row-actions column)', () => {
@@ -123,8 +128,12 @@ describe('table column widths', () => {
     }, { fieldSchemas });
     const cols = [...table.querySelectorAll(':scope > colgroup > col')];
     assert.equal(cols.length, 2);
-    assert.equal(cols[0].style.width, '42%');
-    assert.equal(cols[1].style.width, '17%');
+    assert.equal(cols[0].style.width, '71.2%');
+    assert.ok(!cols[1].style.width);
+    assert.equal(cols[0].style.maxWidth, '');
+    assert.equal(table.querySelector('th')?.style.width, '71.2%');
+    assert.ok(!table.querySelector('td:last-child')?.style.width);
+    assert.equal(table.style.width, '100%');
   });
 
   it('updates live col widths from schema without rebuilding the table', () => {
@@ -139,7 +148,7 @@ describe('table column widths', () => {
     ]);
     const cols = [...table.querySelectorAll(':scope > colgroup > col')];
     assert.equal(cols[0].style.width, '70%');
-    assert.equal(cols[1].style.width, '30%');
+    assert.ok(!cols[1].style.width);
   });
 });
 

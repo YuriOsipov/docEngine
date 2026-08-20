@@ -221,16 +221,35 @@ body {
   padding-left: 1.5em;
 }
 .vision-table-block,
-.document-table {
+.document-table,
+.preview-document .document-table,
+.preview-document .vision-table-block,
+.preview-document .preview-document__block {
+  display: block;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
   margin: 0.5em 0;
+  white-space: normal;
 }
 .vision-table,
 .preview-document .vision-table {
+  display: table;
   width: 100%;
+  min-width: 100%;
+  max-width: none;
   border-collapse: collapse;
   font-family: var(--me-document-font-family);
   font-size: var(--me-table-font-size);
   table-layout: fixed;
+  white-space: normal;
+}
+.preview-document .vision-table col:last-child,
+.preview-document .vision-table thead th:last-child,
+.preview-document .vision-table tbody td:last-child {
+  width: auto;
+  min-width: 0;
+  max-width: none;
 }
 .vision-table th,
 .vision-table td,
@@ -239,8 +258,9 @@ body {
   border: 1px solid #999;
   padding: 4px 8px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   vertical-align: top;
+  white-space: normal;
 }
 .vision-table th,
 .preview-document .vision-table th {
@@ -380,6 +400,7 @@ body {
 .document-table__toolbar,
 .vision-table__col-resizer,
 .vision-table__row-actions,
+.vision-table__row-remove,
 .document-table__row-actions,
 .editor-drag-handle {
   display: none !important;

@@ -600,7 +600,7 @@ export function createSchemaEditorController({
           <span>Column widths (optional, comma-separated)</span>
           <input type="text" data-field="columnWidths" value="${escapeAttr((schema.columns ?? []).map((c) => c.width ?? '').join(', '))}" placeholder="40%, 15%, 15%, 15%, 15%" />
         </label>
-        <p class="schema-form__hint">Widths align with columns by position (e.g. <code>40%, 20%, auto</code>). Percentages are of the full table (the row-actions column typically takes a few percent). Bare numbers count as <code>%</code>. Leave blank or use <code>auto</code> for flexible columns.</p>
+        <p class="schema-form__hint">Widths align with columns by position (e.g. <code>40%, 20%, auto</code>). Percentages are of the data columns and should add up to <code>100%</code>. Bare numbers count as <code>%</code>. Leave blank or use <code>auto</code> for flexible columns.</p>
         <p class="schema-form__hint">Column field IDs are generated automatically from column field names. Align by position with Columns.</p>
         <label class="schema-form__row schema-form__row--checkbox">
           <input type="checkbox" data-field="hideHeader" ${schema.hideHeader ? 'checked' : ''} />

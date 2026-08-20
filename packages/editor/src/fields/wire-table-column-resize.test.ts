@@ -6,6 +6,7 @@ import {
   clampColumnWidthPx,
   percentToColWidthCss,
   redistributeAdjacentWidths,
+  scalePercentCssWidthsToFill,
   widthsPxToPercents,
   wireTableColumnResize,
 } from './wire-table-column-resize.js';
@@ -35,14 +36,20 @@ describe('wire-table-column-resize helpers', () => {
       [234, 234],
       500,
     );
-    assert.equal(next[0].width, '46.8%');
-    assert.equal(next[1].width, '46.8%');
+    assert.equal(next[0].width, '50%');
+    assert.equal(next[1].width, '50%');
     assert.deepEqual(widthsPxToPercents([140, 120], 260), [53.8, 46.2]);
   });
 
   it('uses plain percents for col CSS', () => {
     assert.equal(percentToColWidthCss(42), '42%');
     assert.equal(percentToColWidthCss(58.5), '58.5%');
+  });
+
+  it('scales percent col widths so they fill the table', () => {
+    assert.deepEqual(scalePercentCssWidthsToFill(['42%', '17%']), ['71.2%', '28.8%']);
+    assert.deepEqual(scalePercentCssWidthsToFill(['70%', '30%']), ['70%', '30%']);
+    assert.deepEqual(scalePercentCssWidthsToFill(['40%', '']), ['40%', '']);
   });
 
   it('keeps adjacent pair total constant when redistributing', () => {
@@ -179,13 +186,13 @@ describe('table column resize handles', () => {
     fire(document, 'pointermove', 90);
     fire(document, 'pointerup', 90);
 
-    // Start 100+120 of a 400px table → 25% + 30%; drag +40 → 35% + 20%.
-    assert.equal((schemas[tableId].columns[0] as any).width, '35%');
-    assert.equal((schemas[tableId].columns[1] as any).width, '20%');
+    // Start 100+120 data px; drag +40 → 140/80 → 63.6% / 36.4% of data columns.
+    assert.equal((schemas[tableId].columns[0] as any).width, '63.6%');
+    assert.equal((schemas[tableId].columns[1] as any).width, '36.4%');
     assert.equal(committed?.id, tableId);
-    assert.equal(committed?.columns[0].width, '35%');
-    assert.equal(col0.style.width, '35%');
-    assert.equal(col1.style.width, '20%');
+    assert.equal(committed?.columns[0].width, '63.6%');
+    assert.equal(col0.style.width, '63.6%');
+    assert.equal(col1.style.width, '36.4%');
     table.remove();
   });
 

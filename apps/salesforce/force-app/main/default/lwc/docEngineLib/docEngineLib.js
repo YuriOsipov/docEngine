@@ -320,6 +320,7 @@ table.sf-pdf-table td {
 .document-table__toolbar,
 .vision-table__col-resizer,
 .vision-table__row-actions,
+.vision-table__row-remove,
 .document-table__row-actions {
   display: none !important;
 }
@@ -408,7 +409,7 @@ export function normalizeHtmlForSalesforcePdf(html) {
   // Drop design chrome that should never print
   doc
     .querySelectorAll(
-      '.document-columns__toolbar, .document-columns__col-resizer, .document-table__toolbar, .vision-table__col-resizer, .vision-table__row-actions, .document-table__row-actions'
+      '.document-columns__toolbar, .document-columns__col-resizer, .document-table__toolbar, .vision-table__col-resizer, .vision-table__row-actions, .vision-table__row-remove, .document-table__row-actions'
     )
     .forEach((el) => el.remove());
 
@@ -475,7 +476,7 @@ export function normalizeHtmlForSalesforcePdf(html) {
 
     let widths = [];
     if (cols.length === n) {
-      widths = cols.map((col, i) => {
+      widths = cols.map((col) => {
         const styleW = (col.getAttribute('style') || '').match(/width\s*:\s*([^;]+)/i);
         const attrW = col.getAttribute('width');
         return parsePercentWidth(styleW ? styleW[1] : attrW, null) || null;
@@ -483,6 +484,12 @@ export function normalizeHtmlForSalesforcePdf(html) {
       if (widths.some((w) => !w)) {
         const equal = Math.round((100 / n) * 10) / 10 + '%';
         widths = widths.map((w) => w || equal);
+      } else {
+        const nums = widths.map((w) => Number(String(w).replace('%', '')));
+        const sum = nums.reduce((a, b) => a + b, 0);
+        if (sum > 0 && Math.abs(sum - 100) >= 0.15) {
+          widths = nums.map((value) => Math.round((value / sum) * 1000) / 10 + '%');
+        }
       }
     } else {
       const equal = Math.round((100 / n) * 10) / 10 + '%';
@@ -498,6 +505,16 @@ export function normalizeHtmlForSalesforcePdf(html) {
       cell.style.whiteSpace = 'normal';
       cell.style.verticalAlign = 'top';
     });
+    if (cols.length === n) {
+      cols.forEach((col, i) => {
+        const w = widths[i];
+        if (!w) return;
+        col.setAttribute('width', w);
+        col.style.width = w;
+        col.style.minWidth = w;
+        col.style.maxWidth = '';
+      });
+    }
 
     table.querySelectorAll('th, td').forEach((cell) => {
       cell.style.wordWrap = 'break-word';
