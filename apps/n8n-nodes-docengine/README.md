@@ -4,7 +4,23 @@ n8n community node: bind JSON values (or a source **payload** + template `fieldM
 
 ## Install
 
-From the DocEngine monorepo:
+### n8n (self-hosted community node)
+
+In n8n: **Settings → Community nodes → Install** and enter:
+
+```text
+n8n-nodes-docengine
+```
+
+Or from the n8n nodes directory:
+
+```bash
+npm install n8n-nodes-docengine
+```
+
+Unverified community nodes are available on self-hosted n8n only. See [n8n community node install docs](https://docs.n8n.io/integrations/community-nodes/installation-and-management/).
+
+### From this monorepo
 
 ```bash
 cd apps/n8n-nodes-docengine

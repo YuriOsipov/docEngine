@@ -2,6 +2,7 @@ import {
   applyDocumentValues,
   buildDocExport,
   buildDocumentExport,
+  isDocExport,
   isFieldsExport,
   normalizeDocumentValues,
   normalizeTemplateFieldSchemas,
@@ -9,6 +10,8 @@ import {
   isFieldMappingSpec,
 } from '@docengine/engine';
 import {
+  generateDocumentHtml,
+  generateDocumentPdf,
   generateHtmlFromTemplate,
   generatePdfFromTemplate,
 } from '@docengine/pdf-renderer';
@@ -103,8 +106,13 @@ export function resolveInputValues(
   return fromPath;
 }
 
-export function resolveTemplateFromItem(itemJson: Record<string, unknown>, path = ''): TemplateExport {
-  const raw = getByPath(path, itemJson ?? {});
+export function resolveTemplateFromItem(itemJson: Record<string, unknown>, path: unknown = ''): TemplateExport {
+  // n8n expression mode (`{{ $json.body.template }}`) passes the resolved object, not a path.
+  if (path && typeof path === 'object' && !Array.isArray(path)) {
+    return assertTemplate(path);
+  }
+
+  const raw = getByPath(typeof path === 'string' ? path : '', itemJson ?? {});
   const template = raw ?? itemJson ?? {};
   if (typeof template === 'string') {
     return assertTemplate(parseJsonText(template));
@@ -118,6 +126,20 @@ type MergeOptions = {
 };
 
 function mergeTemplateWithValues(template: TemplateExport, rawValues: unknown, options: MergeOptions = {}) {
+  // Salesforce HTML preview / View as PDF sends a filled snapshot (`kind: "document"` + blocks).
+  // Rebinding that onto the empty template drops line items, addresses, and other token values.
+  if (!options.applyFieldMappingFromTemplate && isDocExport(rawValues)) {
+    const filled = rawValues as Record<string, any>;
+    return {
+      fieldSchemas: {
+        ...(template.fieldSchemas ?? {}),
+        ...(filled.fieldSchemas ?? {}),
+      },
+      blocks: filled.blocks ?? [],
+      pageSetup: filled.pageSetup ?? template.pageSetup,
+    };
+  }
+
   const blocks = template.blocks ?? [];
   const fieldSchemas = template.fieldSchemas ?? {};
 
@@ -139,7 +161,10 @@ function mergeTemplateWithValues(template: TemplateExport, rawValues: unknown, o
           : { values: rawValues ?? {} };
 
   const values = normalizeDocumentValues(payload, blocks, fieldSchemas);
-  return applyDocumentValues(blocks, values, fieldSchemas);
+  return {
+    ...applyDocumentValues(blocks, values, fieldSchemas),
+    pageSetup: template.pageSetup,
+  };
 }
 
 type BuildOptions = MergeOptions & { hideEmptyValues?: boolean };
@@ -153,7 +178,7 @@ export function buildDocumentExportFromInput(template: TemplateExport, rawValues
       time: Date.now(),
       fieldSchemas: merged.fieldSchemas,
       blocks: merged.blocks,
-      pageSetup: template.pageSetup,
+      pageSetup: merged.pageSetup ?? template.pageSetup,
     },
     { hideEmptyValues },
   );
@@ -168,7 +193,7 @@ export function buildFullDocumentExport(template: TemplateExport, rawValues: unk
     time: Date.now(),
     fieldSchemas: merged.fieldSchemas,
     blocks: merged.blocks,
-    pageSetup: template.pageSetup,
+    pageSetup: merged.pageSetup ?? template.pageSetup,
   });
 
   return {
@@ -189,6 +214,23 @@ type RenderOptions = BuildOptions & { outputFormat?: 'html' | 'pdf' };
 export async function renderDocument(template: TemplateExport, rawValues: unknown, options: RenderOptions = {}) {
   const hideEmptyValues = options.hideEmptyValues === true;
   const outputFormat = options.outputFormat === 'pdf' ? 'pdf' : 'html';
+
+  if (!options.applyFieldMappingFromTemplate && isDocExport(rawValues)) {
+    const filled = rawValues as Record<string, any>;
+    const pageSetup = filled.pageSetup ?? template.pageSetup;
+    const doc = { ...filled, pageSetup };
+    if (outputFormat === 'pdf') {
+      const data = await generateDocumentPdf(doc, { pageSetup, hideEmptyValues });
+      return { mimeType: 'application/pdf', fileExtension: 'pdf', data };
+    }
+    const html = await generateDocumentHtml(doc, { pageSetup, fullDocument: true, hideEmptyValues });
+    return {
+      mimeType: 'text/html',
+      fileExtension: 'html',
+      data: Buffer.from(html, 'utf8'),
+    };
+  }
+
   const document = buildDocumentExportFromInput(template, rawValues, options);
 
   if (outputFormat === 'pdf') {

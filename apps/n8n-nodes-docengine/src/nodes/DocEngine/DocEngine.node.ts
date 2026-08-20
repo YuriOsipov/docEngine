@@ -84,7 +84,7 @@ export class DocEngine {
           default: '',
           placeholder: 'template',
           description:
-            'Dot-path into the incoming JSON item for the template object (kind: "template"). Leave empty to use the whole item JSON.',
+            'Dot-path (body.template) or an n8n expression that resolves to the template object (kind: "template"). Leave empty to use the whole item JSON.',
           displayOptions: {
             show: {
               templateSource: ['incoming'],
@@ -101,7 +101,7 @@ export class DocEngine {
           default: '',
           placeholder: 'sections',
           description:
-            'Field values to bind onto the template. A JSON object (n8n expressions / JS allowed), a dot-path into the incoming item (e.g. sections), or empty to use the whole item. When Template Source is Stored in Node, pass values only — not a previous PDF/document payload.',
+            'Field values to bind onto the template, or a filled document snapshot (kind: "document" with blocks — same JSON as Salesforce HTML preview). A JSON object (n8n expressions / JS allowed), a dot-path into the incoming item (e.g. body.document), or empty for the whole item.',
         },
         {
           displayName: 'Use Template Field Mapping',

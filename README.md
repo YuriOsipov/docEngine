@@ -197,7 +197,7 @@ See [`integrations/salesforce/README.md`](./integrations/salesforce/README.md) f
 
 ## n8n
 
-The [`n8n-nodes-docengine`](./apps/n8n-nodes-docengine) package generates HTML/PDF from DocEngine templates inside n8n workflows (`@docengine/engine` + `@docengine/pdf-renderer`).
+The [`n8n-nodes-docengine`](./apps/n8n-nodes-docengine) package generates HTML/PDF from DocEngine templates inside n8n workflows. Install the community node as `n8n-nodes-docengine` on self-hosted n8n, or see the package README for a local build.
 
 ## Scripts reference
 

@@ -1,12 +1,13 @@
 {
   "name": "n8n-nodes-docengine",
-  "version": "0.0.105",
+  "version": "0.0.106",
   "description": "Generate HTML/PDF documents from editor templates in n8n workflows",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/nodes/DocEngine/DocEngine.node.cjs",
   "files": [
-    "dist",
-    "nodes"
+    "dist/nodes/DocEngine/DocEngine.node.cjs",
+    "dist/nodes/DocEngine/docengine.svg",
+    "LICENSE"
   ],
   "keywords": [
     "n8n-community-node-package",
@@ -17,22 +18,42 @@
     "template"
   ],
   "license": "MIT",
+  "author": {
+    "name": "Yurii Osypov",
+    "email": "yurii.osypov@gmail.com"
+  },
+  "homepage": "https://github.com/YuriiOsypov/docEngine/tree/main/apps/n8n-nodes-docengine",
+  "bugs": {
+    "url": "https://github.com/YuriiOsypov/docEngine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YuriiOsypov/docEngine.git",
+    "directory": "apps/n8n-nodes-docengine"
+  },
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [],
     "nodes": [
-      "dist/nodes/DocEngine/DocEngine.node.js"
+      "dist/nodes/DocEngine/DocEngine.node.cjs"
     ]
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs && node scripts/bundle-node.mjs",
     "typecheck": "tsc -p tsconfig.json --pretty false",
     "prepare": "npm run build",
+    "prepublishOnly": "npm test",
     "test": "npm run build && node --test dist/nodes/DocEngine/docengine-utils.test.js"
   },
   "dependencies": {
+    "dejavu-fonts-ttf": "^2.37.3",
+    "linkedom": "^0.18.12",
+    "pdfmake": "^0.2.20"
+  },
+  "devDependencies": {
     "@docengine/engine": "0.0.105",
-    "@docengine/pdf-renderer": "0.0.105"
+    "@docengine/pdf-renderer": "0.0.105",
+    "esbuild": "^0.25.12"
   },
   "peerDependencies": {
     "n8n-workflow": ">=1.0.0"

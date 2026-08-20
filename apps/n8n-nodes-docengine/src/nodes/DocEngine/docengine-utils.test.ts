@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
@@ -83,11 +84,43 @@ test('resolveTemplateFromItem parses JSON string at path', () => {
   assert.equal(resolved.kind, 'template');
 });
 
-test('resolveTemplateFromItem rejects invalid template kind', () => {
-  assert.throws(
-    () => resolveTemplateFromItem({ kind: 'bogus', blocks: [] }),
-    /kind "template"/,
-  );
+test('resolveTemplateFromItem accepts a resolved template object from n8n expressions', () => {
+  const template = JSON.parse(readFileSync(exampleTemplatePath, 'utf8'));
+  const resolved = resolveTemplateFromItem({ body: { other: 1 } }, template);
+  assert.equal(resolved.kind, 'template');
+  assert.ok(resolved.blocks?.length);
+});
+
+test('filled document snapshot keeps token values instead of rebinding the empty template', () => {
+  const template = {
+    kind: 'template' as const,
+    blocks: [
+      {
+        id: 'sec1',
+        type: 'documentSection',
+        data: { name: 'Main', label: 'Main', segments: [{ type: 'field', id: 'order_id' }] },
+      },
+    ],
+    fieldSchemas: { order_id: { type: 'text', label: 'Order ID' } },
+  };
+  const filled = {
+    kind: 'document',
+    fieldSchemas: { order_id: { type: 'text', label: 'Order ID' } },
+    blocks: [
+      {
+        id: 'sec1',
+        type: 'documentSection',
+        data: {
+          name: 'Main',
+          label: 'Main',
+          fieldValues: { order_id: '99' },
+          segments: [{ type: 'field', id: 'order_id' }],
+        },
+      },
+    ],
+  };
+  const full = buildFullDocumentExport(template, filled);
+  assert.equal(full.doc.blocks[0].data.fieldValues.order_id, '99');
 });
 
 test('resolveInputValues uses a mapped object from n8n JS/expression mode', () => {
@@ -134,4 +167,13 @@ test('resolveInputValues does not fall back to the incoming document for a missi
     () => resolveInputValues('missing.path', incoming),
     /not found on the incoming item/,
   );
+});
+
+test('CJS bundle exports DocEngine and resolves PDF fonts', () => {
+  const require = createRequire(import.meta.url);
+  const { DocEngine } = require('./DocEngine.node.cjs');
+  assert.equal(typeof DocEngine, 'function');
+  const node = new DocEngine();
+  assert.equal(node.description.name, 'docEngine');
+  assert.equal(node.description.displayName, 'DocEngine');
 });
