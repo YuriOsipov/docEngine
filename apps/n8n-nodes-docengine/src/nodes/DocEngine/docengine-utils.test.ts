@@ -9,6 +9,7 @@ import {
   buildDocumentExportFromInput,
   buildFullDocumentExport,
   getByPath,
+  isFilledDocumentSnapshot,
   resolveInputValues,
   resolveTemplateFromItem,
 } from './docengine-utils.js';
@@ -121,6 +122,40 @@ test('filled document snapshot keeps token values instead of rebinding the empty
   };
   const full = buildFullDocumentExport(template, filled);
   assert.equal(full.doc.blocks[0].data.fieldValues.order_id, '99');
+});
+
+test('Salesforce snapshot without kind is treated as filled document', () => {
+  // SF DocEnginePdfCallout often omits kind; values live on blocks[].data.fieldValues
+  const snapshot = {
+    fieldSchemas: { order_id: { type: 'text', label: 'Order ID' } },
+    blocks: [
+      {
+        id: 'sec1',
+        type: 'documentSection',
+        data: {
+          name: 'Main',
+          fieldValues: { order_id: '99', totals_grand_total: '4100' },
+          segments: [
+            { type: 'field', id: 'order_id' },
+            { type: 'field', id: 'totals_grand_total' },
+          ],
+        },
+      },
+    ],
+    pageSetup: { format: 'a4' },
+  };
+  assert.equal(isFilledDocumentSnapshot(snapshot), true);
+  assert.equal(isFilledDocumentSnapshot({ kind: 'template', blocks: [] }), false);
+  assert.equal(isFilledDocumentSnapshot({ kind: 'field', sections: {} }), false);
+
+  const template = {
+    kind: 'template' as const,
+    blocks: [{ id: 'sec1', type: 'documentSection', data: { name: 'Main', segments: [] } }],
+    fieldSchemas: { totals_grand_total: { type: 'text', label: 'Grand Total' } },
+  };
+  const full = buildFullDocumentExport(template, snapshot);
+  assert.equal(full.doc.blocks[0].data.fieldValues.order_id, '99');
+  assert.equal(full.doc.blocks[0].data.fieldValues.totals_grand_total, '4100');
 });
 
 test('resolveInputValues uses a mapped object from n8n JS/expression mode', () => {

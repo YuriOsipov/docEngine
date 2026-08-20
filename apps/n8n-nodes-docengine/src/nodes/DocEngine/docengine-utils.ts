@@ -125,17 +125,29 @@ type MergeOptions = {
   payloadJsonPath?: string;
 };
 
+/**
+ * Filled editor snapshot: values live in blocks[].data.fieldValues.
+ * Salesforce callouts often omit `kind: "document"` but still send blocks + fieldSchemas.
+ */
+export function isFilledDocumentSnapshot(data: unknown): boolean {
+  if (isDocExport(data)) return true;
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, any>;
+  if (d.kind === 'template' || isFieldsExport(data)) return false;
+  return Array.isArray(d.blocks);
+}
+
 function mergeTemplateWithValues(template: TemplateExport, rawValues: unknown, options: MergeOptions = {}) {
-  // Salesforce HTML preview / View as PDF sends a filled snapshot (`kind: "document"` + blocks).
+  // Salesforce HTML preview / View as PDF sends a filled snapshot (blocks with fieldValues).
   // Rebinding that onto the empty template drops line items, addresses, and other token values.
-  if (!options.applyFieldMappingFromTemplate && isDocExport(rawValues)) {
+  if (!options.applyFieldMappingFromTemplate && isFilledDocumentSnapshot(rawValues)) {
     const filled = rawValues as Record<string, any>;
     return {
       fieldSchemas: {
         ...(template.fieldSchemas ?? {}),
         ...(filled.fieldSchemas ?? {}),
       },
-      blocks: filled.blocks ?? [],
+      blocks: JSON.parse(JSON.stringify(filled.blocks ?? [])),
       pageSetup: filled.pageSetup ?? template.pageSetup,
     };
   }
@@ -215,10 +227,19 @@ export async function renderDocument(template: TemplateExport, rawValues: unknow
   const hideEmptyValues = options.hideEmptyValues === true;
   const outputFormat = options.outputFormat === 'pdf' ? 'pdf' : 'html';
 
-  if (!options.applyFieldMappingFromTemplate && isDocExport(rawValues)) {
+  if (!options.applyFieldMappingFromTemplate && isFilledDocumentSnapshot(rawValues)) {
     const filled = rawValues as Record<string, any>;
     const pageSetup = filled.pageSetup ?? template.pageSetup;
-    const doc = { ...filled, pageSetup };
+    const doc = {
+      ...filled,
+      kind: filled.kind ?? 'document',
+      blocks: JSON.parse(JSON.stringify(filled.blocks ?? [])),
+      fieldSchemas: {
+        ...(template.fieldSchemas ?? {}),
+        ...(filled.fieldSchemas ?? {}),
+      },
+      pageSetup,
+    };
     if (outputFormat === 'pdf') {
       const data = await generateDocumentPdf(doc, { pageSetup, hideEmptyValues });
       return { mimeType: 'application/pdf', fileExtension: 'pdf', data };
