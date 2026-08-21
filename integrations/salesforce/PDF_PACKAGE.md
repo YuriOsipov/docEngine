@@ -6,7 +6,7 @@ Optional companion to **DocEngine**. Owns the callout to **your** HTTPS PDF host
 
 Compatible: `apps/pdf-service` (`POST /api/v1/render/pdf`). n8n remains an optional self-hosted path if the webhook uses the same path and body.
 
-Salesforce posts `{ template, document }` (values-only save) or `{ doc }` (full document with `blocks` + `pageSetup`).
+Salesforce posts `{ template, document }` only (values-only preferred).
 
 See [PDF.md](./PDF.md).
 

@@ -5,7 +5,9 @@ private class DocEnginePdfCalloutTest {
       System.assert(req.getEndpoint().contains('/api/v1/render/pdf'));
       System.assertEquals('POST', req.getMethod());
       String body = req.getBody();
-      System.assert(body.contains('"doc"') || body.contains('"template"') || body.contains('"document"'));
+      System.assert(body.contains('"template"'));
+      System.assert(body.contains('"document"'));
+      System.assert(!body.contains('"doc"'));
       HttpResponse res = new HttpResponse();
       res.setStatusCode(200);
       res.setHeader('Content-Type', 'application/pdf');
@@ -54,12 +56,29 @@ private class DocEnginePdfCalloutTest {
     Object b64 = callout.call(
       'generatePdfBase64',
       new Map<String, Object>{
-        'documentJson' => '{"kind":"document","version":1,"blocks":[],"fieldSchemas":{}}'
+        'documentJson' => '{"kind":"field","version":2,"sections":{}}',
+        'templateJson' => '{"kind":"template","blocks":[],"fieldSchemas":{}}'
       }
     );
     Test.stopTest();
     System.assert(b64 instanceof String);
     System.assert(String.isNotBlank((String) b64));
+  }
+
+  @IsTest
+  static void filledDocWithoutTemplateThrows() {
+    Boolean threw = false;
+    try {
+      new DocEnginePdfCallout().call(
+        'generatePdfBase64',
+        new Map<String, Object>{
+          'documentJson' => '{"kind":"document","version":1,"blocks":[],"fieldSchemas":{}}'
+        }
+      );
+    } catch (AuraHandledException e) {
+      threw = true;
+    }
+    System.assert(threw);
   }
 
   private static void enableExternalPdf() {
@@ -116,6 +135,37 @@ private class DocEnginePdfCalloutTest {
     Test.stopTest();
     System.assert(b64 instanceof String);
     System.assert(String.isNotBlank((String) b64));
+  }
+
+  @IsTest
+  static void templatePlusFilledDocDoesNotDuplicateDocKey() {
+    // Capturing mock: with template present, body must be template+document only (no "doc").
+    Test.setMock(HttpCalloutMock.class, new PdfLeanBodyMock());
+    DocEnginePdfCallout callout = new DocEnginePdfCallout();
+    Test.startTest();
+    Object b64 = callout.call(
+      'generatePdfBase64',
+      new Map<String, Object>{
+        'documentJson' => '{"blocks":[{"type":"documentSection","data":{"fieldValues":{"a":"1"}}}],"fieldSchemas":{}}',
+        'templateJson' => '{"kind":"template","blocks":[],"fieldSchemas":{}}'
+      }
+    );
+    Test.stopTest();
+    System.assert(b64 instanceof String);
+  }
+
+  private class PdfLeanBodyMock implements HttpCalloutMock {
+    public HTTPResponse respond(HTTPRequest req) {
+      Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(req.getBody());
+      System.assert(body.containsKey('template'), 'expected template');
+      System.assert(body.containsKey('document'), 'expected document');
+      System.assert(!body.containsKey('doc'), 'must not duplicate filled snapshot as doc');
+      HttpResponse res = new HttpResponse();
+      res.setStatusCode(200);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setBodyAsBlob(Blob.valueOf('%PDF-1.4 mock'));
+      return res;
+    }
   }
 
   @IsTest

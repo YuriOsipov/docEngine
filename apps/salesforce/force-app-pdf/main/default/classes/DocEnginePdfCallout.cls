@@ -2,10 +2,11 @@
  * Optional DocEngine_PDF package — Callable implementation discovered by DocEnginePdfController.
  *
  * Actions:
- *   generatePdfBase64     — args.documentJson, optional args.templateJson → String base64
- *   generatePdfPreviewUrl — args.documentJson, optional args.templateJson → HTTPS/relative URL
+ *   generatePdfBase64     — args.documentJson + args.templateJson → String base64
+ *   generatePdfPreviewUrl — args.documentJson + args.templateJson → HTTPS/relative URL
  *   generateAndSavePdf    — args.docInstanceId (Id) → Map contentVersionId, contentDocumentId, docInstanceId
  *
+ * External PDF body is always { template, document } (no full-doc "doc" snapshot).
  * Requires Named Credential DocEngine_Pdf → DocEngine.pro (or compatible host) base URL.
  * POST callout:DocEngine_Pdf/api/v1/render/pdf
  */
@@ -135,42 +136,39 @@ public with sharing class DocEnginePdfCallout implements System.Callable {
     };
   }
 
+  /**
+   * Build POST body for /api/v1/render/pdf.
+   *
+   * External PDF / n8n accept template + values only:
+   *   { "template": …, "document": values-only or fields }
+   *
+   * Never send a full filled snapshot as "doc".
+   */
   @TestVisible
   private static Map<String, Object> buildRenderBody(String documentJson, String templateJson) {
     Map<String, Object> body = new Map<String, Object>();
     Object documentObj = JSON.deserializeUntyped(documentJson);
-    Map<String, Object> documentMap = documentObj instanceof Map<String, Object>
-      ? (Map<String, Object>) documentObj
-      : null;
-    Boolean hasBlocks = documentMap != null && documentMap.get('blocks') instanceof List<Object>;
 
-    if (hasBlocks) {
-      body.put('doc', documentObj);
-      body.put('document', documentObj);
-      Object pageSetup = documentMap.get('pageSetup');
-      if (pageSetup != null) {
-        body.put('pageSetup', pageSetup);
-      }
-    } else {
-      body.put('document', documentObj);
-    }
-
+    Object templateObj = null;
     if (String.isNotBlank(templateJson)) {
       try {
-        Object templateObj = JSON.deserializeUntyped(templateJson);
-        if (templateObj instanceof Map<String, Object>) {
-          body.put('template', templateObj);
+        Object parsed = JSON.deserializeUntyped(templateJson);
+        if (parsed instanceof Map<String, Object>) {
+          templateObj = parsed;
         }
       } catch (Exception e) {
-        // document-only full page render
+        // invalid template JSON falls through to the required-template check
       }
     }
 
-    if (!body.containsKey('doc') && !body.containsKey('template')) {
+    if (templateObj == null) {
       throw new AuraHandledException(
-        'PDF render requires a full document (blocks + pageSetup) or a template plus field values.'
+        'PDF render requires a template plus field values.'
       );
     }
+
+    body.put('template', templateObj);
+    body.put('document', documentObj);
     return body;
   }
 

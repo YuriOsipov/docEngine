@@ -588,13 +588,24 @@ export function normalizeHtmlForSalesforcePdf(html) {
  * PDF via active provider: Salesforce (HTML→Blob.toPdf) or External (pdf-service callout).
  * @param {object} doc
  * @param {object} [options]
+ * @param {object} [options.template] Template export — External PDF sends template + values only
+ * @param {string} [options.html] Prebuilt HTML for Salesforce Blob.toPdf provider
+ * @param {boolean} [options.hideEmptyValues]
  */
 export async function generatePdfBlobFromApex(doc, options = {}) {
   try {
     const provider = await resolvePdfProvider();
-    const documentJson = JSON.stringify(doc);
-    const templateJson =
-      options && options.template != null ? JSON.stringify(options.template) : null;
+    const template =
+      options && options.template != null && typeof options.template === 'object'
+        ? options.template
+        : null;
+    // External PDF: send template + values only (not a second full layout snapshot).
+    const documentPayload =
+      provider !== 'Salesforce' && template && isFullDocumentPayload(doc)
+        ? toValuesOnlyForPdf(doc, options)
+        : doc;
+    const documentJson = JSON.stringify(documentPayload);
+    const templateJson = template != null ? JSON.stringify(template) : null;
     let html = options && options.html;
     if (provider === 'Salesforce') {
       if (!html) {
@@ -614,6 +625,40 @@ export async function generatePdfBlobFromApex(doc, options = {}) {
   } catch (err) {
     throw new Error(withPdfHint(apexErrorMessage(err)));
   }
+}
+
+/**
+ * Collapse a filled editor document into kind:"field" values for lean PDF callouts.
+ * Prefers DocEngineBundle.buildFieldsExport when available.
+ * @param {object} doc
+ * @param {{ hideEmptyValues?: boolean }} [options]
+ */
+export function toValuesOnlyForPdf(doc, options = {}) {
+  if (isValuesOnlyPayload(doc)) {
+    return doc;
+  }
+  const hideEmptyValues = options.hideEmptyValues === true;
+  const buildFieldsExport =
+    typeof window !== 'undefined' &&
+    window.DocEditor &&
+    typeof window.DocEditor.buildFieldsExport === 'function'
+      ? window.DocEditor.buildFieldsExport
+      : null;
+  if (buildFieldsExport) {
+    return buildFieldsExport(doc, { hideEmptyValues });
+  }
+  const values = {};
+  for (const block of doc.blocks || []) {
+    if (block && block.type === 'documentSection' && block.data && block.data.fieldValues) {
+      Object.assign(values, block.data.fieldValues);
+    }
+  }
+  return {
+    kind: 'field',
+    version: 2,
+    time: doc.time || Date.now(),
+    values
+  };
 }
 
 /**

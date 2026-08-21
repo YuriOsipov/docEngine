@@ -12,9 +12,9 @@ Named Credential `DocEngine_Pdf` = site origin with **no trailing slash**. Apex 
 
 Auth: Named Credential **Password** protocol. Username can be `api`; **password** is a DocEngine.pro API token (`de_…`) with `render` (and `pdf`) scope. The host accepts Bearer, `X-Api-Key`, or HTTP Basic (password = token).
 
-### Request shapes
+### Request shape
 
-**A — Template + values (Save + PDF):**
+External PDF / n8n accepts **template + values** only:
 
 ```json
 {
@@ -25,21 +25,7 @@ Auth: Named Credential **Password** protocol. Username can be `api`; **password*
 
 `generateAndSavePdf` loads `Document_JSON__c` (values) and pinned `Template_Version__c.Template_JSON__c` (structure).
 
-**B — Full document page (preview / filled snapshot):**
-
-```json
-{
-  "doc": {
-    "kind": "document",
-    "time": 0,
-    "fieldSchemas": {},
-    "blocks": [/* … */],
-    "pageSetup": { "format": "a4", "orientation": "portrait" }
-  }
-}
-```
-
-A document with a `blocks` array is rendered as a full paginated PDF (`pageSetup` included). Also accepts `document` with `blocks`.
+Preview **View as PDF** with External PDF also sends this shape: LWC collapses the filled editor doc to values and Apex posts `template` + `document` only (no `doc` snapshot).
 
 ## Subscriber setup
 
@@ -60,7 +46,7 @@ Salesforce cannot call `http://localhost`. For local pdf-service, expose HTTPS (
 - **Unchecked (Salesforce)** — `Blob.toPdf(html)` after LWC normalizes HTML (CSS columns → tables, fixed table layout)
 - **Checked (External)** — callout to `callout:DocEngine_Pdf/api/v1/render/pdf`, then `DocEngineInstanceController.savePdfFromBlob`
 
-LWC: **Save + PDF** on `docEngineFiller`. Preview **View as PDF** sends the full editor document (`blocks` + `pageSetup`).
+LWC: **Save + PDF** on `docEngineFiller`. Preview **View as PDF** (External) sends **template + values** only; Salesforce provider still uses HTML → `Blob.toPdf`.
 
 ## Alternative hosts
 

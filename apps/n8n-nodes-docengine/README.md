@@ -36,12 +36,11 @@ Salesforce **DocEngine_PDF** calls `POST /api/v1/render/pdf` (see [PDF.md](../..
 
 Use this node when you want PDFs on **your** n8n host. The webhook path must match Apex (`/api/v1/render/pdf`) or change `GENERATE_PATH` in `DocEnginePdfCallout`.
 
-Apex sends two body shapes (`DocEnginePdfCallout.buildRenderBody`):
+Apex sends **template + values** only (`DocEnginePdfCallout.buildRenderBody`):
 
 | Shape | Body | Handle with |
 |-------|------|-------------|
-| Values-only (Save + PDF) | `{ "template", "document" }` (no blocks) | **DocEngine** node |
-| Full page (preview / filled) | `{ "doc", "document" }` with `blocks` | Forward to docengine-web / pdf-service |
+| Template + values | `{ "template", "document" }` values-only (`kind: "field"`) | **DocEngine** node |
 
 ### Importable example (recommended)
 
@@ -50,18 +49,6 @@ See [`examples/`](./examples/) — workflow JSON, sample requests, and setup:
 ```text
 Salesforce Named Credential
   → Webhook (POST /api/v1/render/pdf)
-  → IF has blocks?
-       YES → HTTP Request → docengine-web /api/v1/render/pdf
-       NO  → DocEngine (body.template + body.document → PDF)
-  → Respond to Webhook (binary PDF)
-```
-
-Import `examples/salesforce-render-pdf.workflow.json` in n8n, set `DOCENGINE_PDF_BASE_URL` + `DOCENGINE_API_TOKEN`, activate, point Named Credential `DocEngine_Pdf` at the n8n origin (no trailing slash).
-
-### Values-only only (minimal)
-
-```text
-Webhook (POST /api/v1/render/pdf)
   → DocEngine
        Template Source: From incoming
        Template JSON Path: body.template
@@ -70,7 +57,7 @@ Webhook (POST /api/v1/render/pdf)
   → Respond to Webhook (binary PDF)
 ```
 
-Does **not** cover SF preview payloads with `blocks` — use the branched example for full parity.
+Import `examples/salesforce-render-pdf.workflow.json` in n8n, activate, point Named Credential `DocEngine_Pdf` at the n8n origin (no trailing slash).
 
 ### Payload + field mapping
 

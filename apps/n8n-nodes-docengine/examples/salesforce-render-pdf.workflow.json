@@ -2,7 +2,7 @@
   "name": "DocEngine — Salesforce PDF render",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "description": "Salesforce DocEngine_PDF compatible: POST /api/v1/render/pdf → PDF bytes. Branches on full doc (blocks) vs template+field values."
+    "description": "Salesforce DocEngine_Pdf compatible: POST /api/v1/render/pdf → join template + values → PDF bytes."
   },
   "nodes": [
     {
@@ -23,77 +23,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "has-blocks",
-              "leftValue": "={{ Array.isArray($json.body?.doc?.blocks) || Array.isArray($json.body?.document?.blocks) }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "if-has-blocks",
-      "name": "Has document blocks?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [260, 300],
-      "notesInFlow": true,
-      "notes": "SF preview / filled snapshot → doc+document with blocks. Save+PDF values-only → template + document (kind field / sections)."
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ ($env.DOCENGINE_PDF_BASE_URL || 'http://localhost:4100').replace(/\\/$/, '') }}/api/v1/render/pdf",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.DOCENGINE_API_TOKEN || '' }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.body }}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false,
-              "responseFormat": "file",
-              "outputPropertyName": "data"
-            }
-          },
-          "timeout": 120000
-        }
-      },
-      "id": "http-full-doc",
-      "name": "Render full doc (host)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [520, 160],
-      "notesInFlow": true,
-      "notes": "Forwards SF body to docengine-web or pdf-service. Set env DOCENGINE_PDF_BASE_URL and DOCENGINE_API_TOKEN (de_… with render/pdf scopes)."
-    },
-    {
-      "parameters": {
         "templateSource": "incoming",
         "templateJsonPath": "body.template",
         "valuesJsonPath": "body.document",
@@ -107,9 +36,9 @@
       "name": "DocEngine",
       "type": "n8n-nodes-docengine.docEngine",
       "typeVersion": 5,
-      "position": [520, 440],
+      "position": [260, 300],
       "notesInFlow": true,
-      "notes": "SF values-only path: template + document. Requires n8n-nodes-docengine."
+      "notes": "SF template + values: body.template + body.document → PDF. Requires n8n-nodes-docengine."
     },
     {
       "parameters": {
@@ -135,7 +64,7 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [780, 300],
+      "position": [520, 300],
       "notesInFlow": true,
       "notes": "Apex expects raw PDF bytes (getBodyAsBlob). Do not return JSON or base64."
     }
@@ -145,36 +74,7 @@
       "main": [
         [
           {
-            "node": "Has document blocks?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has document blocks?": {
-      "main": [
-        [
-          {
-            "node": "Render full doc (host)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "DocEngine",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Render full doc (host)": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
