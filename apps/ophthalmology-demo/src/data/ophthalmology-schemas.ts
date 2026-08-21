@@ -85,10 +85,10 @@ const schemas = {
 
 const visionTableId = 'visionTable';
 const visionColumns = buildTableColumnsFromLabels(
-  ['Eye', 'vis', 'Sph', 'Cyl', 'Ax', 'Vis', 'B/B'],
+  ['Eye', 'Sph', 'Cyl', 'Ax', 'Vis', 'B/B'],
   [],
   [],
-  ['name', 'vis', 'sph', 'cyl', 'ax', 'vis2', 'bo'],
+  ['name', 'sph', 'cyl', 'ax', 'vis2', 'bo'],
 );
 const visionRows = [
   { key: 'row1', label: '' },
